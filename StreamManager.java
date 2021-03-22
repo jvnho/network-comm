@@ -1,11 +1,15 @@
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 
 public class StreamManager{
     private ArrayList<Socket>listStreamerSocket;
-    private String[] listStreamer;
+    private ArrayList<String> listStreamer;
     private int port;
     private int lenMax;
     private int currentLen;
@@ -13,7 +17,7 @@ public class StreamManager{
 
     public StreamManager(int port){
         this.listStreamerSocket = new ArrayList<Socket>();
-        this.listStreamer = new String[100];
+        this.listStreamer = new ArrayList<String>();;
         this.port = port;
         this.lenMax = 100;
         this.currentLen = 0;
@@ -29,7 +33,8 @@ public class StreamManager{
                     new Thread(new SaveSocketStreamer(streamersocket)).start();
                 }
             }catch(IOException e){
-                System.out.println("error on create ServerSocket");
+                System.out.println("error on StreamerAccpet");
+                e.printStackTrace();
             }
         }
     }
@@ -39,16 +44,53 @@ public class StreamManager{
             this.soc = s;
         }
         public void run(){
-            synchronized(StreamManager.this){
-                if(lenMax == currentLen){
-                    //si elle est de capacité maxiaml il renvoie un message (RENO) et ferme la connexion
-                }else{
-                    //sinon j'enregistre (REOK) et garde la connexion
+            try{
+                BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
+                String message = reception.readLine(); //readline enleve le \n ?
+                message = "ITEM"+ message.substring(4);//ends with \r ??
+                PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
+
+                synchronized(StreamManager.this){
+                    if(currentLen < lenMax){
+                        StreamManager.this.listStreamerSocket.add(soc);
+                        StreamManager.this.listStreamer.add(message);
+                        currentLen = currentLen + 1;
+                        sending.println("REOK\r");// \r\n
+
+                    }else if(lenMax == currentLen){
+                        sending.println("RENO\r");
+                        soc.close();
+                    }
                 }
+            }catch(IOException e){
+                System.out.println("error SaveSocketStreamer");
+                e.printStackTrace();
             }
         }
     }
+    public class ClientAccept implements Runnable{
+        public void run(){
+            try{
+                ServerSocket serverSocket = new ServerSocket(StreamManager.this.port);
+                while(true){
+                    Socket soc = serverSocket.accept();
+                    new Thread(new ClientQuery(soc)).start();
+                }
+            }catch(IOException e){
+                System.out.println("error ClientAccept");
+                e.printStackTrace();
+            }
+        }
+    }
+    public class ClientQuery implements Runnable{
+        Socket soc;
+        public ClientQuery(Socket soc){
+            this.soc = soc;
+        }
+        public void run(){
+            //communication avec le client
+        }
+    }
     public static void main(String []args){
-
     }
 }
