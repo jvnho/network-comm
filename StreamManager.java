@@ -19,7 +19,7 @@ public class StreamManager{
         this.listStreamerSocket = new ArrayList<Socket>();
         this.listStreamer = new ArrayList<String>();;
         this.port = port;
-        this.lenMax = 100;
+        this.lenMax = 99;
         this.currentLen = 0;
         this.time_refresh = 5;
     }
@@ -47,6 +47,7 @@ public class StreamManager{
             try{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n ?
+                //TODO si le message est de mauvais format
                 message = "ITEM"+ message.substring(4);//ends with \r ??
                 PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
 
@@ -88,9 +89,38 @@ public class StreamManager{
             this.soc = soc;
         }
         public void run(){
-            //communication avec le client
+            try{
+                BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
+                String message = reception.readLine(); //readline enleve le \n ?
+                PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
+
+                //TODO si le message est de format
+                if(message.equals("LIST\r")){
+                    synchronized(StreamManager.this){
+                        sending.println("LINB "+StreamManager.this.getCurrentLen()+"\r");// ? getCurrentLen is also synchronized check if don't block??
+                        for (String streamer : listStreamer) {
+                            sending.println(streamer);
+                        }
+                        soc.close();
+                    }
+                }else{
+                    System.out.println("Mauvais format par le client");
+                    soc.close();
+                }
+            }catch(IOException e){
+                System.out.println("error ClientQuery");
+                e.printStackTrace();
+            }
         }
     }
+    //test in case of being called in a synchronized block
+    public synchronized String getCurrentLen(){
+        String resutl = Integer.toString(this.currentLen);
+        return (resutl.length()==1)?"0"+resutl:resutl;
+    }
     public static void main(String []args){
+        StreamManager manager = new StreamManager(Integer.parseInt(args[0]));
+        new Thread(manager.new StreamerAccept()).start();//thread witch accept streamer and communicate with them
+        new Thread(manager.new ClientAccept()).start();//thread witch accept all the client and communicate with them
     }
 }
