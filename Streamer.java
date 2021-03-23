@@ -64,14 +64,17 @@ public class Streamer{
         }
     }
 
-    public synchronized void write(Message toWrite){
-        this.messageList.add(toWrite);
+    public synchronized void write(String code, String originID, String msgToWrite){
+        Message m = new Message(this.msgIndex, code, originID, msgToWrite);
+        this.messageList.add(m);
         this.tabIndex = (this.tabIndex+1)%999;
         this.msgIndex = (this.msgIndex+1)%9999;
     }
 
     public synchronized Message[] read(int n){
-        return null;
+        //retrieve the last n elements on this.msgList and convert it into a java array
+        ArrayList<Message> list = (ArrayList<Message>)this.messageList.subList(this.messageList.size()-n, this.messageList.size());
+        return (Message [])list.toArray();
     }
     
     public synchronized String readRandom(String code){
@@ -82,6 +85,10 @@ public class Streamer{
     @Override public String toString(){
         //avant de return convertir les addresses ip et identifiant dans le format demandé
         return id + " " + multicastIP + " " + multicastPort + " " + machineIP + " " + userPort; 
+    }
+
+    public static void main(String[] args){
+
     }
 
     private class StreamerTCP implements Runnable{
@@ -127,10 +134,57 @@ public class Streamer{
                 {
                     BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     PrintWriter pw = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-                    pw.print("HI\n");
-                    pw.flush();
-                    String mess=br.readLine();
-                    System.out.println("Message recu :"+mess);
+                    boolean correctQuery = false;
+                    while(correctQuery == false)
+                    {
+                        String[] query = br.readLine().split(" ");
+                        if(query[0].equals("LAST"))
+                        {
+                            if(query.length < 2){
+                                pw.print("Missing LAST argument.");
+                                pw.flush();
+                            } else if(query.length != 2) {
+                                pw.print("Incorrect LAST format.");
+                                pw.flush();
+                            }
+                            else
+                            {
+                                try 
+                                {
+                                    int n = Integer.valueOf(query[1]);
+                                    Message[] history = Streamer.this.read(n);
+                                    for(Message m : history){
+                                        pw.print(m.toString());
+                                        pw.flush();
+                                    }
+                                    pw.print("ENDM");
+                                    pw.flush();
+                                    correctQuery = true;
+                                } catch (NumberFormatException e){
+                                    pw.print("Incorrect number format.");
+                                    pw.flush();
+                                }
+                            }
+                        } else if(query[0].equals("MESS"))
+                        {
+                            if(query.length < 3) {
+                                pw.print("Missing MESS argument.");
+                                pw.flush();
+                            } else if(query.length != 3) {
+                                pw.print("Incorrect MESS format.");
+                                pw.flush();
+                            } else
+                            {
+                                Streamer.this.write(query[0], query[1], query[2]);
+                                pw.print("ACKM");
+                                correctQuery = true;
+                            }
+                        } else if(query[0].equals("RUOK"))
+                        { 
+                            pw.print("IMOK");
+                            pw.flush();
+                        }
+                    }
                     br.close();
                     pw.close();
                     socket.close();
