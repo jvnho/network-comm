@@ -3,10 +3,14 @@ import java.io.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Streamer{
     
     private static int LIST_SIZE = 1000;
+    private static int DELAY = 3000; //milliseconds
 
     private String id;
     private int userPort;
@@ -28,14 +32,15 @@ public class Streamer{
         try{
             this.machineIP = InetAddress.getLocalHost().getHostName();
         } catch(UnknownHostException e){
-            System.out.println(e);
+            System.out.println("");
             e.printStackTrace();
         }               
     }   
 
     public void initMessageList(Message [] list){
         this.messageList = new ArrayList<Message>();
-        for(int i = 0; i < list.length; i++){
+        for(int i = 0; i < list.length; i++)
+        {
             this.messageList.add(list[i]);
             this.tabIndex++;
             this.msgIndex++;
@@ -58,8 +63,10 @@ public class Streamer{
             br.close();
             socket.close();
         }
-        catch(Exception e){
-            System.out.println(e);
+        catch(UnknownHostException e){
+            System.out.println("Error when creating socket.");
+            e.printStackTrace();
+        } catch(IOException e){
             e.printStackTrace();
         }
     }
@@ -99,7 +106,7 @@ public class Streamer{
             try{
                 this.server = new ServerSocket(Streamer.this.userPort);
             } catch(IOException e){
-                System.out.println(e);
+                System.out.println("Error when creating ServerSocket object instance.");
                 e.printStackTrace();
             }
         }
@@ -115,8 +122,8 @@ public class Streamer{
                     t.start();
                 }   
             }
-            catch(Exception e){
-                System.out.println(e);
+            catch(IOException e){
+                System.out.println("Server attempt accepting connection error.");
                 e.printStackTrace();
             } 
         }
@@ -134,17 +141,16 @@ public class Streamer{
                 {
                     BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     PrintWriter pw = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-                    boolean correctQuery = false;
-                    while(correctQuery == false)
+                    while(true)
                     {
                         String[] query = br.readLine().split(" ");
                         if(query[0].equals("LAST"))
                         {
                             if(query.length < 2){
-                                pw.print("Missing LAST argument.");
+                                pw.print("Missing LAST argument.\n");
                                 pw.flush();
                             } else if(query.length != 2) {
-                                pw.print("Incorrect LAST format.");
+                                pw.print("Incorrect LAST argument format.\n");
                                 pw.flush();
                             }
                             else
@@ -153,47 +159,80 @@ public class Streamer{
                                 {
                                     int n = Integer.valueOf(query[1]);
                                     Message[] history = Streamer.this.read(n);
-                                    for(Message m : history){
+                                    for(Message m : history)
+                                    {
                                         pw.print(m.toString());
                                         pw.flush();
                                     }
                                     pw.print("ENDM");
                                     pw.flush();
-                                    correctQuery = true;
+                                    break;
                                 } catch (NumberFormatException e){
-                                    pw.print("Incorrect number format.");
+                                    pw.print("Incorrect number format.\n");
                                     pw.flush();
                                 }
                             }
                         } else if(query[0].equals("MESS"))
                         {
                             if(query.length < 3) {
-                                pw.print("Missing MESS argument.");
+                                pw.print("Missing MESS argument.\n");
                                 pw.flush();
                             } else if(query.length != 3) {
-                                pw.print("Incorrect MESS format.");
+                                pw.print("Incorrect MESS format.\n");
                                 pw.flush();
                             } else
                             {
                                 Streamer.this.write(query[0], query[1], query[2]);
-                                pw.print("ACKM");
-                                correctQuery = true;
+                                pw.print("ACKM\n");
+                                break;
                             }
                         } else if(query[0].equals("RUOK"))
                         { 
                             pw.print("IMOK");
                             pw.flush();
+                            break;
                         }
                     }
                     br.close();
                     pw.close();
                     socket.close();
                 }
-                catch(Exception e){
+                catch(IOException e){
                     System.out.println(e);
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    private class StreamerUDP implements Runnable{
+
+        private DatagramSocket dso;
+
+        public StreamerUDP(){
+            try {
+                this.dso = new DatagramSocket();
+            } catch(SocketException e){
+                System.out.println("Could not create a DatagramSocket");
+            }
+        }
+
+        @Override public void run(){
+            TimerTask task = new TimerTask()
+            {
+                @Override public void run(){
+                    try{
+                        byte[] packet = readRandom("DIFF").getBytes();
+                        DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
+                        dso.send(paquet);
+                    } catch(IOException e){
+                        System.out.println("Streamer could not send package to subscribers");
+                        e.printStackTrace();
+                    }
+                }
+            };
+            Timer timer = new Timer();
+            timer.schedule(task, new Date(), Streamer.DELAY);
         }
     }
 }
