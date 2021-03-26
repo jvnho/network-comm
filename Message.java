@@ -9,7 +9,19 @@ public class Message {
         this.messageNumber = messageNumber;
         this.code = code;
         this.originID = originID;
-        this.message = message;
+        initMessage(message);
+    }
+
+    public void initMessage(String message){
+        int strLength = message.length();
+        String newMessage = "";
+        if(message.charAt(strLength-1) == '\n' && message.charAt(strLength-2) == '\r'){
+            newMessage = message.substring(0, strLength);
+        }
+        if(newMessage.length() > 140){
+            throw new IllegalArgumentException();
+        }
+        this.message = newMessage + "#".repeat(140 - newMessage.length()) + "\r\n";
     }
 
     @Override public String toString(){

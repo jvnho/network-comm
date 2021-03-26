@@ -1,7 +1,6 @@
 import java.net.*;
 import java.io.*;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.Random;
 import java.util.Date;
 import java.util.Timer;
@@ -9,7 +8,7 @@ import java.util.TimerTask;
 
 public class Streamer{
     
-    private static int LIST_SIZE = 1000;
+    private static int LIST_MAX_SIZE = 1000;
     private static int DELAY = 3000; //milliseconds
 
     private String id;
@@ -18,14 +17,14 @@ public class Streamer{
     private int multicastPort;
     private String machineIP;
     private int msgIndex;
-    private int tabIndex;
-    private List<Message> messageList;
+    private LinkedList<Message> messageList;
+    private boolean readyToWrite;
 
     public Streamer(String id, String multicastIP, int multicastPort, int userPort, Message[] streamerMsg){
         initStreamerID(id);
         initPorts(multicastPort, userPort);
         initAdress(multicastIP);
-        initMessageList(streamerMsg);    
+        initMessageList(streamerMsg);
     }   
 
     public void initAdress(String multicastIP){
@@ -36,7 +35,8 @@ public class Streamer{
         }
         for(int i = 0; i < tokens.length; i++)
         {
-            if(isNumber(tokens[i])){
+            if(isNumber(tokens[i]))
+            {
                 int length = tokens[i].length();
                 if(length == 3) 
                     continue;
@@ -71,7 +71,7 @@ public class Streamer{
 
     public void initPorts(int multicastPort, int userPort){
         if(String.valueOf(multicastPort).length() != 4 || String.valueOf(userPort).length() != 4){
-            System.out.println("");
+            System.out.println("Incorrect port format.");
             throw new IllegalArgumentException();
         }
         this.multicastPort = multicastPort;
@@ -91,14 +91,13 @@ public class Streamer{
 
     public void initMessageList(Message [] list){
         this.msgIndex = 0;
-        this.tabIndex = 0;
-        this.messageList = new ArrayList<Message>();
+        this.messageList = new LinkedList<Message>();
         for(int i = 0; i < list.length; i++)
         {
             this.messageList.add(list[i]);
-            this.tabIndex++;
             this.msgIndex++;
         }
+        this.readyToWrite = true;
     }
 
     public void registerToManager(String managerAddr, int managerPort){
@@ -126,20 +125,42 @@ public class Streamer{
     }
 
     public synchronized void write(String code, String originID, String msgToWrite){
-        Message m = new Message(this.msgIndex, code, originID, msgToWrite);
-        this.messageList.add(m);
-        this.tabIndex = (this.tabIndex+1)%999;
-        this.msgIndex = (this.msgIndex+1)%9999;
+        try 
+        {
+            while(this.readyToWrite == false){
+                wait();
+            }
+            this.readyToWrite = false;
+            notifyAll();
+            Message m = new Message(this.msgIndex, code, originID, msgToWrite); // TODO: catch exception de la classe Message
+            if(this.messageList.size() == LIST_MAX_SIZE)
+                this.messageList.removeFirst();
+            this.messageList.add(m);
+            this.msgIndex = (this.msgIndex+1)%9999;
+        } catch (InterruptedException e){
+            System.out.println("Wait exception error");
+            throw new IllegalArgumentException();
+        } 
     }
 
-    public synchronized Message[] read(int n){
-        //retrieve the last n elements on this.msgList and convert it into a java array
-        ArrayList<Message> list = (ArrayList<Message>)this.messageList.subList(this.messageList.size()-n, this.messageList.size());
+    public synchronized Message[] read(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
+        try
+        {
+            while(this.readyToWrite == true){
+                wait();
+            }
+            this.readyToWrite = true;
+            notifyAll();
+        } catch(InterruptedException e){
+            System.out.println("Wait exception error");
+            throw new IllegalArgumentException();
+        }
+        LinkedList<Message> list = (LinkedList<Message>)this.messageList.subList(this.messageList.size()-n, this.messageList.size());
         return (Message [])list.toArray();
     }
     
     public synchronized String readRandom(String code){
-        Message random = this.messageList.get(new Random().nextInt(this.tabIndex+1));
+        Message random = this.messageList.get(new Random().nextInt(this.messageList.size()+1));
         return new Message(random.getMessageNumber(), code, random.getOriginID(), random.getMessage()).toString();
     }
 
