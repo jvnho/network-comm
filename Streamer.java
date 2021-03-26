@@ -22,22 +22,76 @@ public class Streamer{
     private List<Message> messageList;
 
     public Streamer(String id, String multicastIP, int multicastPort, int userPort, Message[] streamerMsg){
-        this.id = id; //gestion erreur nombre de caractères
-        this.userPort = userPort;
-        this.multicastIP = multicastIP;
-        this.multicastPort = multicastPort;
-        this.msgIndex = 0;
-        this.tabIndex = 0;
-        initMessageList(streamerMsg);
+        initStreamerID(id);
+        initPorts(multicastPort, userPort);
+        initAdress(multicastIP);
+        initMessageList(streamerMsg);    
+    }   
+
+    public void initAdress(String multicastIP){
+        String[] tokens = multicastIP.split(".");
+        if(tokens.length != 4){
+            System.out.println("Incorrect IP address format.");
+            throw new IllegalArgumentException();
+        }
+        for(int i = 0; i < tokens.length; i++)
+        {
+            if(isNumber(tokens[i])){
+                int length = tokens[i].length();
+                if(length == 3) 
+                    continue;
+                else if (length > 3) {
+                    System.out.println("Incorrect IP address format.");
+                    throw new IllegalArgumentException();
+                } else {
+                    tokens[i] = "0".repeat(3-length) + tokens[i];
+                }
+            } else {
+                System.out.println("Incorrect IP address format.");
+                throw new IllegalArgumentException();
+            }
+        }
+        this.multicastIP = String.join(".", tokens);
         try{
             this.machineIP = InetAddress.getLocalHost().getHostName();
         } catch(UnknownHostException e){
-            System.out.println("");
+            System.out.println("Error when retrieving streamer's ip address.");
             e.printStackTrace();
-        }               
-    }   
+        }           
+    }
+
+    public static boolean isNumber(String s){
+        try{
+            Integer.valueOf(s);
+        } catch(NumberFormatException e){
+            return false;
+        }
+        return true;
+    }
+
+    public void initPorts(int multicastPort, int userPort){
+        if(String.valueOf(multicastPort).length() != 4 || String.valueOf(userPort).length() != 4){
+            System.out.println("");
+            throw new IllegalArgumentException();
+        }
+        this.multicastPort = multicastPort;
+        this.userPort = userPort;
+    }
+
+    public void initStreamerID(String s){
+        if(s.equals("")){
+            System.out.println("");
+            throw new IllegalArgumentException();
+        }
+        else if(s.length() == 8)
+            this.id = s; 
+        else
+            this.id = s + "#".repeat(8 - s.length());
+    }
 
     public void initMessageList(Message [] list){
+        this.msgIndex = 0;
+        this.tabIndex = 0;
         this.messageList = new ArrayList<Message>();
         for(int i = 0; i < list.length; i++)
         {
