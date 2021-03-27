@@ -80,13 +80,14 @@ public class StreamManager{
             try{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n  ****???
-                if(message.equals("LIST\r")){//communication avec client
+                if(message.equals("LIST")){//communication avec client
                     System.out.println("demande du client");
                     StreamManager.this.sendListToClient(this.soc);
                 }else if(message.substring(0, 4).equals("REGI")){
                     System.out.println("demande du diffuseur");
                     StreamManager.this.saveSocketStreamer(this.soc, message);
                 }else{
+                    System.out.println("fermeture");
                     soc.close();
                 }
             }catch(IOException e){
