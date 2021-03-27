@@ -1,6 +1,7 @@
 public class Format{
-    static int[] lenMessageRegi = new int[]{4, 8, 15, 4, 15, 6};
+    static int[] lenMessageRegi = new int[]{4, 8, 15, 4, 15, 5};
     public static boolean isIpV4(String s){
+        
         //"127.000.000.001"
         String[] content = s.split("\\.");
         int len = content.length;
@@ -17,17 +18,21 @@ public class Format{
         return true;
     }
     public static boolean isregi(String s){
-        //creer des class exection pour facilité les message d'erreur
         System.out.println(s);
+        
+        //creer des class exection pour facilité les message d'erreur
         String []content = s.split(" ");
+        System.out.println("tail dernier = "+content[5].length());
+        
         if(content.length != 6){
             System.out.println("wrong spacing");
             return false; //wrong spacing
         }
         int nbString = content.length;
+        System.out.println(content[nbString-1].charAt(4) == '\n');
         for(int i=0; i<nbString; i++){
             if(content[i].length() != lenMessageRegi[i]){
-                System.out.println("wrong size");
+                System.out.println("wrong size "+i);
                 return false;//wrong size
             }
         }
@@ -35,7 +40,7 @@ public class Format{
             System.out.println("wrong begining");
             return false; //wrong begining
         }
-        if(content[nbString-1].charAt(4) != '\r' || content[nbString-1].charAt(5) != '\n'){
+        if(content[nbString-1].charAt(4) != '\n'){
             System.out.println("wrong ending");
             return false;//wrong ending
         }

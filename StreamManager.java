@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 
 public class StreamManager{
     private ArrayList<Socket>listStreamerSocket;
@@ -24,111 +25,115 @@ public class StreamManager{
         this.time_refresh = 5;
     }
 
-    public class StreamerAccept implements Runnable{
-        public void run(){
-            try{
-                ServerSocket serverSocket = new ServerSocket(StreamManager.this.port);
-                while(true){
-                    Socket streamersocket = serverSocket.accept();
-                    new Thread(new SaveSocketStreamer(streamersocket)).start();
+    public void saveSocketStreamer(Socket soc, String message){
+        try{
+            message = message+"\n";//restore the '\n'
+            if(Format.isregi(message)){ //correct format
+                message = "ITEM"+ message.substring(4);
+                PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
+                synchronized(this){
+                    if(currentLen < lenMax){
+                        this.listStreamerSocket.add(soc);
+                        this.listStreamer.add(message);
+                        currentLen = currentLen + 1;
+                        sending.println("REOK\r");// \r\n
+                        sending.flush();
+
+                    }else if(lenMax == currentLen){
+                        sending.println("RENO\r");
+                        sending.flush();
+                        soc.close();
+                    }
                 }
-            }catch(IOException e){
-                System.out.println("error on StreamerAccpet");
-                e.printStackTrace();
+            }else{
+                soc.close();
             }
+        }catch(IOException e){
+            System.out.println("error SaveSocketStreamer");
+            e.printStackTrace();
         }
     }
-    public class SaveSocketStreamer implements Runnable{
+    public void sendListToClient(Socket soc){
+        try{
+            PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
+            synchronized(this){
+                sending.println("LINB "+this.getCurrentLen()+"\r");// ? getCurrentLen is also synchronized check if don't block??
+                sending.flush();
+                for (String streamer : listStreamer) {
+                    sending.print(streamer);
+                    sending.flush();
+                }
+                soc.close();
+            }
+        }catch(IOException e){
+            System.out.println("error ClientQuery");
+            e.printStackTrace();
+        }
+    }
+
+    public class CommunicationStreamerOrClient implements Runnable{
         Socket soc;
-        public SaveSocketStreamer(Socket s){
+        public CommunicationStreamerOrClient(Socket s){
             this.soc = s;
         }
         public void run(){
             try{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
-                String message = reception.readLine(); //readline remove '\n' at the end ***?
-                message = message+"\n";//restore the '\n'
-                if(Format.isregi(message)){ //correct format
-                    message = "ITEM"+ message.substring(4);
-                    PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
-                    synchronized(StreamManager.this){
-                        if(currentLen < lenMax){
-                            StreamManager.this.listStreamerSocket.add(soc);
-                            StreamManager.this.listStreamer.add(message);
-                            currentLen = currentLen + 1;
-                            sending.println("REOK\r");// \r\n
-                            sending.flush();
-
-                        }else if(lenMax == currentLen){
-                            sending.println("RENO\r");
-                            sending.flush();
-                            soc.close();
-                        }
-                    }
-                }else{
-                    soc.close();
-                }
-            }catch(IOException e){
-                System.out.println("error SaveSocketStreamer");
-                e.printStackTrace();
-            }
-        }
-    }
-    public class ClientAccept implements Runnable{
-        public void run(){
-            try{
-                ServerSocket serverSocket = new ServerSocket(StreamManager.this.port);
-                while(true){
-                    Socket soc = serverSocket.accept();
-                    new Thread(new ClientQuery(soc)).start();
-                }
-            }catch(IOException e){
-                System.out.println("error ClientAccept");
-                e.printStackTrace();
-            }
-        }
-    }
-    public class ClientQuery implements Runnable{
-        Socket soc;
-        public ClientQuery(Socket soc){
-            this.soc = soc;
-        }
-        public void run(){
-            try{
-                BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n  ****???
-                PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
-
-                if(message.equals("LIST\r")){
-                    synchronized(StreamManager.this){
-                        sending.println("LINB "+StreamManager.this.getCurrentLen()+"\r");// ? getCurrentLen is also synchronized check if don't block??
-                        sending.flush();
-                        for (String streamer : listStreamer) {
-                            sending.print(streamer);
-                            sending.flush();
-                        }
-                        soc.close();
-                    }
+                if(message.equals("LIST\r")){//communication avec client
+                    System.out.println("demande du client");
+                    StreamManager.this.sendListToClient(this.soc);
+                }else if(message.substring(0, 4).equals("REGI")){
+                    System.out.println("demande du diffuseur");
+                    StreamManager.this.saveSocketStreamer(this.soc, message);
                 }else{
-                    System.out.println("Mauvais format par le client");
                     soc.close();
                 }
             }catch(IOException e){
-                System.out.println("error ClientQuery");
+                System.out.println("reading or writing error");
                 e.printStackTrace();
+            }catch(IndexOutOfBoundsException e){
+                System.out.println("wrong message sended to the StreamManager");
+                try{soc.close();}catch(IOException a){}
             }
         }
     }
+    
+    public void launchStreamManger(){
+        //create one server socket
+        try{
+            ServerSocket serverSocket = new ServerSocket(this.port);
+            while(true){
+                Socket socket = serverSocket.accept();
+                new Thread(new CommunicationStreamerOrClient(socket)).start();
+            }
+        }catch(IOException e){
+            System.out.println("error on create serversocket");
+            e.printStackTrace();
+        }   
+    }
+
     //test in case of being called in a synchronized block
     public synchronized String getCurrentLen(){
         String resutl = Integer.toString(this.currentLen);
         return (resutl.length()==1)?"0"+resutl:resutl;
     }
-    public void launchStreamManger(){
-        new Thread(this.new StreamerAccept()).start();//thread witch accept streamer and communicate with them
-        new Thread(this.new ClientAccept()).start();//thread witch accept all the client and communicate with them
-    }
     public static void main(String []args){
+        StreamManager test = new StreamManager(Integer.parseInt(args[0]));
+        test.launchStreamManger();
+        //affichage incorect au niveau synchronisation
+        while(true){
+            try{
+                for(String s: test.listStreamer){
+                    System.out.println(s);
+                }
+                System.out.println("-------------");
+                TimeUnit.SECONDS.sleep(test.time_refresh);
+            }catch(InterruptedException e){
+                e.printStackTrace();
+            }
+            
+        }
         //"REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r\n"
     }
 }
