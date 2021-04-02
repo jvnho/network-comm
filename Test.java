@@ -14,9 +14,12 @@ public class Test{
         public void run(){
             try{
                 PrintWriter sending = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+                sending.println("LIST\r");
                 sending.flush();
+                System.out.println("envoye list");
                 BufferedReader reading = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String recu = reading.readLine();
+                System.out.println("retour serveur = "+recu);
                 String[] s = recu.split(" ");
                 int len = Integer.parseInt(s[1]);
                 System.out.println("len = "+len);
@@ -40,8 +43,8 @@ public class Test{
             System.out.println(recu);
 
             //test client communique avec gestionnaire
-            for(int i = 0; i<40; i++){
-                new Thread(new ClientThread(socket)).start();
+            for(int i = 0; i<50; i++){
+                new Thread(new ClientThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
             }
             
         }catch(Exception e){
