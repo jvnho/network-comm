@@ -25,22 +25,38 @@ public class Test{
                 System.out.println("len = "+len);
                 for(int i=0; i<len; i++){
                     recu = reading.readLine();
-                    System.out.println(recu);
+                    //System.out.println(recu);
                 }
             }
-            catch(IOException e){}
+            catch(IOException e){
+                System.out.println("erreur thread client");
+            }
+        }
+    }
+    public static class DiffuseurThread implements Runnable{
+        Socket socket;
+        public DiffuseurThread(Socket s){
+            this.socket = s;
+        }
+        public void run(){
+            try{
+                PrintWriter sender = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+                sender.println("REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r");
+                sender.flush();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                String recu = reader.readLine();
+                System.out.println(recu);
+            }catch(IOException e){
+                System.out.println("erreur thread diffuseur");
+            }
         }
     }
     public static void main(String []args){
         try{
             //test diffuseur communique avec gestionnaire
-            Socket socket=new Socket("lulu",Integer.parseInt(args[0]));
-            PrintWriter sender = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-            sender.println("REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r");
-            sender.flush();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String recu = reader.readLine();
-            System.out.println(recu);
+            for(int i = 0; i<110; i++){
+                new Thread(new DiffuseurThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
+            }
 
             //test client communique avec gestionnaire
             for(int i = 0; i<50; i++){
