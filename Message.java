@@ -12,6 +12,13 @@ public class Message {
         initMessage(message);
     }
 
+    public Message(int messageNumber, String code, String message){
+        this.messageNumber = messageNumber;
+        this.code = code;
+        this.originID = "allooooo";
+        initMessage(message);
+    }
+
     public void initMessage(String message){
         int strLength = message.length();
         String newMessage = "";

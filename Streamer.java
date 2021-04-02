@@ -107,7 +107,7 @@ public class Streamer{
             BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter pw = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
             String msg = "REGI " + this.id + " " + this.multicastIP + " " + this.multicastPort + " " 
-                + this.machineIP + " " + this.userPort;
+                + this.machineIP + " " + this.userPort + "\r\n";
             pw.print(msg);
             pw.flush();    
             String recv = br.readLine();
@@ -170,7 +170,17 @@ public class Streamer{
     }
 
     public static void main(String[] args){
-
+        Message m1 = new Message(0, "DIFF", "bonjour");
+        Message m2 = new Message(0, "DIFF", "bonsoir");
+        Message[] list = {m1, m2};
+        Streamer streamer = new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]), list);
+        streamer.registerToManager("lulu", 4442);
+        StreamerTCP streamerTCP = streamer.new StreamerTCP();
+        StreamerUDP streamerUDP = streamer.new StreamerUDP();
+        Thread t1 = new Thread(streamerTCP);
+        Thread t2 = new Thread(streamerUDP);
+        t1.start();
+        t2.start();
     }
 
     private class StreamerTCP implements Runnable{
