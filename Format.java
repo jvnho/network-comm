@@ -1,5 +1,6 @@
 public class Format{
     static int[] lenMessageRegi = new int[]{4, 8, 15, 4, 15, 4};
+    static String[] message = new String[]{"REGI", "ID", "IP1", "port1", "IP2", "port2"};
     public static boolean isIpV4(String s){
         
         //"127.000.000.001"
@@ -29,7 +30,7 @@ public class Format{
         int nbString = content.length;
         for(int i=0; i<nbString; i++){
             if(content[i].length() != lenMessageRegi[i]){
-                System.out.println("wrong size "+i);
+                System.out.println("wrong size of "+message[i]);
                 return false;//wrong size
             }
         }

@@ -80,7 +80,6 @@ public class StreamManager{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n  ****???
                 System.out.println(message);
-                System.out.println(message.substring(0, 4));
                 if(message.equals("LIST")){//communication avec client
                     System.out.println("demande du client");
                     StreamManager.this.sendListToClient(this.soc);
