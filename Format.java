@@ -20,16 +20,13 @@ public class Format{
     public static boolean isregi(String s){
         System.out.println(s);
         
-        //creer des class exection pour facilité les message d'erreur
+        //creer des class exection pour faciliter les message d'erreur
         String []content = s.split(" ");
-        System.out.println("tail dernier = "+content[5].length());
-        
         if(content.length != 6){
             System.out.println("wrong spacing");
             return false; //wrong spacing
         }
         int nbString = content.length;
-        System.out.println(content[nbString-1].charAt(4) == '\n');
         for(int i=0; i<nbString; i++){
             if(content[i].length() != lenMessageRegi[i]){
                 System.out.println("wrong size "+i);

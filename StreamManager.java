@@ -79,6 +79,8 @@ public class StreamManager{
             try{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n  ****???
+                System.out.println(message);
+                System.out.println(message.substring(0, 4));
                 if(message.equals("LIST")){//communication avec client
                     System.out.println("demande du client");
                     StreamManager.this.sendListToClient(this.soc);
@@ -132,7 +134,6 @@ public class StreamManager{
             }catch(InterruptedException e){
                 e.printStackTrace();
             }
-            
         }
         //"REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r\n"
     }
