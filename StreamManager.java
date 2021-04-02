@@ -27,14 +27,13 @@ public class StreamManager{
 
     public void saveSocketStreamer(Socket soc, String message){
         try{
-            message = message+"\n";//restore the '\n'
             if(Format.isregi(message)){ //correct format
                 message = "ITEM"+ message.substring(4);
                 PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
                 synchronized(this){
                     if(currentLen < lenMax){
                         this.listStreamerSocket.add(soc);
-                        this.listStreamer.add(message);
+                        this.listStreamer.add(message+"\r\n");
                         currentLen = currentLen + 1;
                         sending.println("REOK\r");// \r\n
                         sending.flush();

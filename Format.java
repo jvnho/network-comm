@@ -1,5 +1,5 @@
 public class Format{
-    static int[] lenMessageRegi = new int[]{4, 8, 15, 4, 15, 5};
+    static int[] lenMessageRegi = new int[]{4, 8, 15, 4, 15, 4};
     public static boolean isIpV4(String s){
         
         //"127.000.000.001"
@@ -40,13 +40,9 @@ public class Format{
             System.out.println("wrong begining");
             return false; //wrong begining
         }
-        if(content[nbString-1].charAt(4) != '\n'){
-            System.out.println("wrong ending");
-            return false;//wrong ending
-        }
         try {
             int port1 = Integer.parseInt(content[3]);
-            int port2 = Integer.parseInt(content[3].substring(0, 4));
+            int port2 = Integer.parseInt(content[5]);
             if(port1<0 || port1>9999 || port2<0 || port2>9999){
                 System.out.println("invalid num port");
                 return false;//invalid numm port
