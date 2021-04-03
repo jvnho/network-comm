@@ -6,11 +6,14 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
+//nicolas 239.255.255.255 5452 7879
+
 public class Streamer{
     
     private static int LIST_MAX_SIZE = 1000;
     private static int DELAY = 3000; //milliseconds
 
+    private Socket managerSocket;
     private String id;
     private int userPort;
     private String multicastIP;
@@ -20,15 +23,14 @@ public class Streamer{
     private LinkedList<Message> messageList;
     private boolean readyToWrite;
 
-    public Streamer(String id, String multicastIP, int multicastPort, int userPort, Message[] streamerMsg){
+    public Streamer(String id, String multicastIP, int multicastPort, int userPort){
         initStreamerID(id);
         initPorts(multicastPort, userPort);
-        initAdress(multicastIP);
-        initMessageList(streamerMsg);
+        initAdresses(multicastIP);
     }   
 
-    public void initAdress(String multicastIP){
-        String[] tokens = multicastIP.split(".");
+    public String addressToFormat(String ip){
+        String[] tokens = ip.split("\\.");
         if(tokens.length != 4){
             System.out.println("Incorrect IP address format.");
             throw new IllegalArgumentException();
@@ -51,9 +53,17 @@ public class Streamer{
                 throw new IllegalArgumentException();
             }
         }
-        this.multicastIP = String.join(".", tokens);
+        return String.join(".", tokens);
+    }
+
+    public void initAdresses(String multicastIP){
+        this.multicastIP = addressToFormat(multicastIP);
         try{
-            this.machineIP = InetAddress.getLocalHost().getHostName();
+            String streamerAddr = InetAddress.getLocalHost().toString();
+            String s1 = streamerAddr.substring(streamerAddr.indexOf("/")+1);
+            s1.trim();
+            streamerAddr = s1;
+            this.machineIP = addressToFormat(streamerAddr);
         } catch(UnknownHostException e){
             System.out.println("Error when retrieving streamer's ip address.");
             e.printStackTrace();
@@ -103,18 +113,13 @@ public class Streamer{
     public void registerToManager(String managerAddr, int managerPort){
         try
         {
-            Socket socket = new Socket(managerAddr, managerPort);
-            BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter pw = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-            String msg = "REGI " + this.id + " " + this.multicastIP + " " + this.multicastPort + " " 
-                + this.machineIP + " " + this.userPort + "\r\n";
-            pw.print(msg);
-            pw.flush();    
-            String recv = br.readLine();
-            System.out.println(recv);
-            pw.close();
-            br.close();
-            socket.close();
+            this.managerSocket = new Socket(managerAddr, managerPort);
+            BufferedReader br = new BufferedReader(new InputStreamReader(this.managerSocket.getInputStream()));
+            PrintWriter pw = new PrintWriter(new OutputStreamWriter(this.managerSocket.getOutputStream()));
+            StreamManagerCommunication smc = new StreamManagerCommunication(this.managerSocket, br, pw);
+            Thread t = new Thread(smc);
+            t.start();
+
         }
         catch(UnknownHostException e){
             System.out.println("Error when creating socket.");
@@ -170,17 +175,48 @@ public class Streamer{
     }
 
     public static void main(String[] args){
-        Message m1 = new Message(0, "DIFF", "bonjour");
-        Message m2 = new Message(0, "DIFF", "bonsoir");
-        Message[] list = {m1, m2};
-        Streamer streamer = new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]), list);
+        Streamer streamer = new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]));
         streamer.registerToManager("lulu", 4442);
-        StreamerTCP streamerTCP = streamer.new StreamerTCP();
-        StreamerUDP streamerUDP = streamer.new StreamerUDP();
-        Thread t1 = new Thread(streamerTCP);
-        Thread t2 = new Thread(streamerUDP);
+        Thread t1 = new Thread(streamer.new StreamerTCP());
+        Thread t2 = new Thread(streamer.new StreamerUDP());
         t1.start();
         t2.start();
+    }
+
+    private class StreamManagerCommunication implements Runnable {
+
+        private Socket managerSocket;
+        private BufferedReader br;
+        private PrintWriter pw;
+
+        public StreamManagerCommunication(Socket s, BufferedReader br, PrintWriter pw){
+            this.managerSocket = s;
+            this.br = br;
+            this.pw = pw;
+        }
+        
+        @Override public void run(){
+            String msg = "REGI " + Streamer.this.toString() +  "\r\n";
+            this.pw.print(msg);
+            this.pw.flush();    
+            try {
+                String recv = br.readLine();
+                System.out.println(recv);
+                while(true)
+                {
+                    recv = br.readLine();
+                    System.out.println(recv);
+                    if(recv.equals("RUOK"))
+                    { 
+                        pw.print("IMOK");
+                        pw.flush();
+                    }
+                }
+            } catch (IOException e){
+                System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
+                e.printStackTrace();
+            }
+        }
     }
 
     private class StreamerTCP implements Runnable{
@@ -232,10 +268,10 @@ public class Streamer{
                         if(query[0].equals("LAST"))
                         {
                             if(query.length < 2){
-                                pw.print("Missing LAST argument.\n");
+                                pw.print("Missing LAST argument.\r\n");
                                 pw.flush();
                             } else if(query.length != 2) {
-                                pw.print("Incorrect LAST argument format.\n");
+                                pw.print("Incorrect LAST argument format.\r\n");
                                 pw.flush();
                             }
                             else
@@ -253,17 +289,17 @@ public class Streamer{
                                     pw.flush();
                                     break;
                                 } catch (NumberFormatException e){
-                                    pw.print("Incorrect number format.\n");
+                                    pw.print("Incorrect number format.\r\n");
                                     pw.flush();
                                 }
                             }
                         } else if(query[0].equals("MESS"))
                         {
                             if(query.length < 3) {
-                                pw.print("Missing MESS argument.\n");
+                                pw.print("Missing MESS argument.\r\n");
                                 pw.flush();
                             } else if(query.length != 3) {
-                                pw.print("Incorrect MESS format.\n");
+                                pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
                             } else
                             {
@@ -271,11 +307,11 @@ public class Streamer{
                                 pw.print("ACKM\n");
                                 break;
                             }
-                        } else if(query[0].equals("RUOK"))
-                        { 
-                            pw.print("IMOK");
+                        } 
+                        else
+                        {
+                            pw.print("Command not found.\r\n");
                             pw.flush();
-                            break;
                         }
                     }
                     br.close();
