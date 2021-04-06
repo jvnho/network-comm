@@ -57,11 +57,11 @@ public class Test{
             for(int i = 0; i<110; i++){
                 new Thread(new DiffuseurThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
             }
-
+            /*
             //test client communique avec gestionnaire
             for(int i = 0; i<50; i++){
                 new Thread(new ClientThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
-            }
+            }*/
             
         }catch(Exception e){
             System.out.println("error on create socket");
