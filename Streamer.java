@@ -143,8 +143,8 @@ public class Streamer{
             this.messageList.add(m);
             this.msgIndex = (this.msgIndex+1)%9999;
         } catch (InterruptedException e){
-            System.out.println("Wait exception error");
-            throw new IllegalArgumentException();
+            System.out.println("Wait exception error when writing");
+            e.printStackTrace();
         } 
     }
 
@@ -157,8 +157,8 @@ public class Streamer{
             this.readyToWrite = true;
             notifyAll();
         } catch(InterruptedException e){
-            System.out.println("Wait exception error");
-            throw new IllegalArgumentException();
+            System.out.println("Wait exception error when reading");
+            e.printStackTrace();
         }
         LinkedList<Message> list = (LinkedList<Message>)this.messageList.subList(this.messageList.size()-n, this.messageList.size());
         return (Message [])list.toArray();
@@ -208,7 +208,7 @@ public class Streamer{
                     System.out.println(recv);
                     if(recv.equals("RUOK"))
                     { 
-                        pw.print("IMOK");
+                        pw.print("IMOK\r\n");
                         pw.flush();
                     }
                 }
@@ -260,22 +260,18 @@ public class Streamer{
             @Override public void run(){
                 try
                 {
-                    BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    PrintWriter pw = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    BufferedReader br = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+                    PrintWriter pw = new PrintWriter(new OutputStreamWriter(this.socket.getOutputStream()));
                     while(true)
                     {
                         String[] query = br.readLine().split(" ");
                         if(query[0].equals("LAST"))
                         {
-                            if(query.length < 2){
-                                pw.print("Missing LAST argument.\r\n");
-                                pw.flush();
-                            } else if(query.length != 2) {
+                            if(query.length != 2){
                                 pw.print("Incorrect LAST argument format.\r\n");
                                 pw.flush();
                             }
-                            else
-                            {
+                            else{
                                 try 
                                 {
                                     int n = Integer.valueOf(query[1]);
@@ -285,7 +281,7 @@ public class Streamer{
                                         pw.print(m.toString());
                                         pw.flush();
                                     }
-                                    pw.print("ENDM");
+                                    pw.print("ENDM\r\n");
                                     pw.flush();
                                     break;
                                 } catch (NumberFormatException e){
@@ -293,23 +289,17 @@ public class Streamer{
                                     pw.flush();
                                 }
                             }
-                        } else if(query[0].equals("MESS"))
-                        {
-                            if(query.length < 3) {
-                                pw.print("Missing MESS argument.\r\n");
-                                pw.flush();
-                            } else if(query.length != 3) {
+                        } else if(query[0].equals("MESS")){
+                            if(query.length != 3) {
                                 pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
-                            } else
-                            {
+                            } else {
                                 Streamer.this.write(query[0], query[1], query[2]);
-                                pw.print("ACKM\n");
+                                pw.print("ACKM\r\n");
+                                pw.flush();
                                 break;
                             }
-                        } 
-                        else
-                        {
+                        } else{
                             pw.print("Command not found.\r\n");
                             pw.flush();
                         }
