@@ -136,7 +136,7 @@ public class Streamer{
         }
     }
 
-    public synchronized void write(String code, String originID, String msgToWrite){
+    public synchronized boolean write(String code, String originID, String msgToWrite){
         try 
         {
             while(this.readyToWrite == false){
@@ -144,15 +144,20 @@ public class Streamer{
             }
             this.readyToWrite = false;
             notifyAll();
-            Message m = new Message(this.msgIndex, code, originID, msgToWrite); // TODO: catch exception de la classe Message
+            Message m = new Message(this.msgIndex, code, originID, msgToWrite);
             if(this.messageList.size() == LIST_MAX_SIZE)
                 this.messageList.removeFirst();
             this.messageList.add(m);
             this.msgIndex = (this.msgIndex+1)%9999;
         } catch (InterruptedException e){
             System.out.println("Wait exception error when writing");
-            e.printStackTrace();
+            return false;
         } 
+        catch (IllegalArgumentException e){
+            System.out.println("Error when trying to create a Message instance object");
+            return false;
+        }
+        return true;
     }
 
     public synchronized Message[] read(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
@@ -278,8 +283,10 @@ public class Streamer{
                                 pw.print("Incorrect LAST argument format.\r\n");
                                 pw.flush();
                             } else {
-                                try 
-                                {
+                                if(!isNumber(query[1])){
+                                    pw.print("Incorrect number format.\r\n");
+                                    pw.flush();
+                                } else {
                                     int n = Integer.valueOf(query[1]);
                                     Message[] history = Streamer.this.read(n);
                                     for(Message m : history)
@@ -290,9 +297,6 @@ public class Streamer{
                                     pw.print("ENDM\r\n");
                                     pw.flush();
                                     break;
-                                } catch (NumberFormatException e){
-                                    pw.print("Incorrect number format.\r\n");
-                                    pw.flush();
                                 }
                             }
                         } else if(query[0].equals("MESS")){
@@ -300,7 +304,10 @@ public class Streamer{
                                 pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
                             } else {
-                                Streamer.this.write(query[0], query[1], query[2]);
+                                if(Streamer.this.write(query[0], query[1], query[2]) == false){
+                                    pw.print("Le diffuseurr n'a pas accepté votre message.\r\n");
+                                    pw.flush();
+                                }
                                 pw.print("ACKM\r\n");
                                 pw.flush();
                                 break;
