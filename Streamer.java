@@ -11,9 +11,15 @@ import java.util.TimerTask;
 public class Streamer{
     
     private static int LIST_MAX_SIZE = 1000;
-    private static int DELAY = 3000; //milliseconds
+    private static int DELAY = 3000;
+    private static String[] messages = {
+        "She only paints with bold colors, she does not like pastels.",
+        "Getting up at dawn is for the birds.",
+        "He excelled at firing people nicely.",
+        "Be careful with that butter knife.",
+        "He waited for the stop sign to turn to a go sign."
+    };
 
-    private Socket managerSocket;
     private String id;
     private int userPort;
     private String multicastIP;
@@ -25,6 +31,7 @@ public class Streamer{
 
     public Streamer(String id, String multicastIP, int multicastPort, int userPort){
         initStreamerID(id);
+        initMessageList();
         initPorts(multicastPort, userPort);
         initAdresses(multicastIP);
     }   
@@ -99,12 +106,12 @@ public class Streamer{
             this.id = s + "#".repeat(8 - s.length());
     }
 
-    public void initMessageList(Message [] list){
+    public void initMessageList(){
         this.msgIndex = 0;
         this.messageList = new LinkedList<Message>();
-        for(int i = 0; i < list.length; i++)
+        for(int i = 0; i < messages.length; i++)
         {
-            this.messageList.add(list[i]);
+            this.messageList.add(new Message(this.msgIndex, "DIFF", this.id, messages[i]));
             this.msgIndex++;
         }
         this.readyToWrite = true;
@@ -113,10 +120,10 @@ public class Streamer{
     public void registerToManager(String managerAddr, int managerPort){
         try
         {
-            this.managerSocket = new Socket(managerAddr, managerPort);
-            BufferedReader br = new BufferedReader(new InputStreamReader(this.managerSocket.getInputStream()));
-            PrintWriter pw = new PrintWriter(new OutputStreamWriter(this.managerSocket.getOutputStream()));
-            StreamManagerCommunication smc = new StreamManagerCommunication(this.managerSocket, br, pw);
+            Socket managerSocket = new Socket(managerAddr, managerPort);
+            BufferedReader br = new BufferedReader(new InputStreamReader(managerSocket.getInputStream()));
+            PrintWriter pw = new PrintWriter(new OutputStreamWriter(managerSocket.getOutputStream()));
+            StreamManagerCommunication smc = new StreamManagerCommunication(managerSocket, br, pw);
             Thread t = new Thread(smc);
             t.start();
 
@@ -270,8 +277,7 @@ public class Streamer{
                             if(query.length != 2){
                                 pw.print("Incorrect LAST argument format.\r\n");
                                 pw.flush();
-                            }
-                            else{
+                            } else {
                                 try 
                                 {
                                     int n = Integer.valueOf(query[1]);
