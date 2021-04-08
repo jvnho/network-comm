@@ -8,10 +8,7 @@ typedef struct infoStreamer{
 }infoStreamer;
 typedef struct client{
     char id[9];//plus \0
-    int socSubstcrition[99];
-    int maxSubscription;
-    int iSubscription;//current index
 }client;
 extern int getListStreamer(char *adrStreamManager, int port, char result[99][58], int *result_len);
-extern int subscribe(client *cl, char *streamer);
+extern int subscribe(char *streamer);
 #endif

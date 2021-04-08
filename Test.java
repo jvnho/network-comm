@@ -41,7 +41,7 @@ public class Test{
         public void run(){
             try{
                 PrintWriter sender = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-                sender.println("REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r");
+                sender.println("REGI diffprof 225.010.020.030 4999 192.168.070.236 5999\r");
                 sender.flush();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String recu = reader.readLine();
@@ -54,14 +54,15 @@ public class Test{
     public static void main(String []args){
         try{
             //test diffuseur communique avec gestionnaire
-            for(int i = 0; i<110; i++){
+            /*for(int i = 0; i<110; i++){
                 new Thread(new DiffuseurThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
-            }
+            }*/
             /*
             //test client communique avec gestionnaire
             for(int i = 0; i<50; i++){
                 new Thread(new ClientThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
             }*/
+            new Thread(new DiffuseurThread(new Socket("lulu",Integer.parseInt(args[0])))).start();
             
         }catch(Exception e){
             System.out.println("error on create socket");

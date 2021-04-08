@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <unistd.h>
 #include "client.h"
 //return len, or -1 if bad format
 int getLen(char *message){
@@ -44,11 +45,13 @@ int getListStreamer(char *adrStreamManager, int port, char result[99][58],int *r
     int r = inet_aton(adrStreamManager, &adr.sin_addr);//check if machine name
     if(r == -1){
         printf("error(getListStreamer): failed to fill the adress\n");
+        close(soc);
         return -1;
     }
     r = connect(soc, (const struct sockaddr *)&adr, sizeof(struct sockaddr_in));
     if(r == -1){
         printf("error(getListStreamer): can't connect to streamManager\n");
+        close(soc);
         return -1;
     }
     send(soc, "LIST\r\n", sizeof(char)*strlen("LIST\r\n"), 0);
@@ -64,6 +67,7 @@ int getListStreamer(char *adrStreamManager, int port, char result[99][58],int *r
         recv(soc, items, 57, 0);
         memcpy(result[i], items, 58);
     }
+    close(soc);
     return 1;
 }
 //TO DO -> verify the format
@@ -86,24 +90,23 @@ int parseStreamer(infoStreamer *result, char *streamer){
     return 0;
 }
 //save a socket associated with a streamer
-int subscribe(client *cl, char *streamer){
-    if(cl->iSubscription == cl->maxSubscription){
-        printf("reach max subscription\n");
-        return -1;
-    }
+int subscribe(char *streamer){
+    printf("%s\n", streamer);
     //parse the streamer buffer
     infoStreamer result;
     memset(&result, 0, sizeof(infoStreamer));
     if(parseStreamer(&result, streamer)==-1)return -1;
+    printf("port multi = %d\n", result.multicastPort);
+    printf("ip multi = %s\n", result.multicatIP);
     //create the soc
-    int sock=socket(PF_INET,SOCK_DGRAM,0);
+    int sock=socket(PF_INET, SOCK_DGRAM, 0);
     if(sock == -1){
         printf("error: client failed to subscribe\n");
         return -1;
     }
     //make reusable
-    int ok=1;
-    int test=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&ok,sizeof(ok));
+    int parameter=1;
+    int test=setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &parameter, sizeof(parameter));
     if(test == -1){
         printf("error: failed to setup socket(reusable)\n");
         return -1;
@@ -128,35 +131,65 @@ int subscribe(client *cl, char *streamer){
         printf("error: failed to setup socket(subscribe)\n");
         return -1;
     }
-    cl->socSubstcrition[cl->iSubscription] = sock;
-    cl->iSubscription = (cl->iSubscription) + 1;
-    return 1;
+    char tampon[162];
+    while(1){
+        int rec=recv(sock,tampon,161,0);
+        tampon[rec]='\0';
+        printf("Message recu : %s\n",tampon);
+    }
+    return sock;
 }
 int main(void){
+    char test[130] = "ITEM diffprof 225.010.020.030 4999 192.168.070.236 5999\r\n";
+    subscribe(test);
+    /*
     client c;
     memset(&c, 0, sizeof(client));
     memcpy(c.id, "abcdef78", sizeof(char)*strlen("abcdef78"));
-    c.iSubscription = 0;
-    c.maxSubscription = 99;
-
-    //demande de liste au gestionaire
+    printf("client : %s\n\n", c.id);
+    printf("_______________________\n\n");
+    printf("Streamer List:\n\n");
+    //showing the list of streamer from StreamerManager
     char result[99][58];
     for(int i = 0; i<58; i++)memset(result[i], 0, 58);
     int len = 0;
-    int test = getListStreamer("192.168.70.236", 4141, result, &len);
+    //gestionaire sur lulu, port 4141
+    int test = getListStreamer("192.168.70.236", 4141, result, &len); //passer en argument grace au fichier de config(gestionnaire)
     if(test == -1){
         printf("failed to get list\n");
         return -1;
     }
-    //printf("len = %d\n", len);
-    infoStreamer info;
-    memset(&info, 0, sizeof(infoStreamer));
-    parseStreamer(&info, result[0]);
-    printf("multi port = %d\n", info.multicastPort);
-    printf("multi ip = %s\n", info.multicatIP);
-    /*for(int i = 0; i<len; i++){
-        printf("%s\n", result[i]);
-    }*/
+    if(len == 0){
+        printf("Not streamer yet\n");
+    }else{
+        for(int i = 0; i<len; i++){
+            printf("[%d] %s\n",i, result[i]);
+        }
+    }
+    printf("_______________________\n\n");
+    //subscribe to streamer
+    printf("chose the index of streamer: \n\n");
+    int index = 0;
+    char buff[3];
+    memset(buff, 0, 2);
+    read(1, buff, 3);
+    index = atoi(buff);
+    int soc = subscribe(result[index]);
+    if(soc == -1)return -1;
+    char received[162];
+    int r = 0;
+    printf("fini de subscribe\n");
+    while(1){
+        memset(received, 0, 162);
+        r = recv(soc, received, 161, 0);
+        printf("apres receiv\n");
+        if(r == -1){
+            printf("end of reception\n");
+            break;
+        }
+        printf("%s\n", received);
+    }
+    */
     
     return 0;
 }
