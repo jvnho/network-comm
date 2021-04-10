@@ -197,12 +197,12 @@ public class Streamer{
 
     private class StreamManagerCommunication implements Runnable {
 
-        private Socket managerSocket;
+        private Socket communicationStreamer;
         private BufferedReader br;
         private PrintWriter pw;
 
         public StreamManagerCommunication(Socket s, BufferedReader br, PrintWriter pw){
-            this.managerSocket = s;
+            this.communicationStreamer = s;
             this.br = br;
             this.pw = pw;
         }
@@ -214,15 +214,22 @@ public class Streamer{
             try {
                 String recv = br.readLine();
                 System.out.println(recv);
-                while(true)
+                if(recv.equals("REOK"))
                 {
-                    recv = br.readLine();
-                    System.out.println(recv);
-                    if(recv.equals("RUOK"))
-                    { 
-                        pw.print("IMOK\r\n");
-                        pw.flush();
+                    while(true)
+                    {
+                        recv = br.readLine();
+                        System.out.println(recv);
+                        if(recv.equals("RUOK"))
+                        { 
+                            pw.print("IMOK\r\n");
+                            pw.flush();
+                        }
                     }
+                } else {
+                    this.br.close();
+                    this.pw.close();
+                    this.communicationStreamer.close();
                 }
             } catch (IOException e){
                 System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
@@ -305,7 +312,7 @@ public class Streamer{
                                 pw.flush();
                             } else {
                                 if(Streamer.this.write(query[0], query[1], query[2]) == false){
-                                    pw.print("Le diffuseurr n'a pas accepté votre message.\r\n");
+                                    pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                     pw.flush();
                                 }
                                 pw.print("ACKM\r\n");
