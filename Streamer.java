@@ -12,13 +12,6 @@ public class Streamer{
     
     private static int LIST_MAX_SIZE = 1000;
     private static int DELAY = 3000;
-    private static String[] messages = {
-        "She only paints with bold colors, she does not like pastels.",
-        "Getting up at dawn is for the birds.",
-        "He excelled at firing people nicely.",
-        "Be careful with that butter knife.",
-        "He waited for the stop sign to turn to a go sign."
-    };
 
     private String id;
     private int userPort;
@@ -26,7 +19,7 @@ public class Streamer{
     private int multicastPort;
     private String machineIP;
     private int msgIndex;
-    private LinkedList<Message> messageList;
+    private LinkedList<Message> lastMessages;
     private boolean readyToWrite;
 
     public Streamer(String id, String multicastIP, int multicastPort, int userPort){
@@ -34,6 +27,11 @@ public class Streamer{
         initMessageList();
         initPorts(multicastPort, userPort);
         initAdresses(multicastIP);
+        registerToManager("lulu", 4442);
+        Thread t1 = new Thread(this.new StreamerTCP());
+        Thread t2 = new Thread(this.new StreamerUDP());
+        t1.start();
+        t2.start();
     }   
 
     public String addressToFormat(String ip){
@@ -108,10 +106,10 @@ public class Streamer{
 
     public void initMessageList(){
         this.msgIndex = 0;
-        this.messageList = new LinkedList<Message>();
+        this.lastMessages = new LinkedList<Message>();
         for(int i = 0; i < messages.length; i++)
         {
-            this.messageList.add(new Message(this.msgIndex, "DIFF", this.id, messages[i]));
+            this.lastMessages.add(new Message(this.msgIndex, "DIFF", this.id, messages[i]));
             this.msgIndex++;
         }
         this.readyToWrite = true;
@@ -136,7 +134,7 @@ public class Streamer{
         }
     }
 
-    public synchronized boolean write(String code, String originID, String msgToWrite){
+    public synchronized boolean write(String originID, String msgToWrite){
         try 
         {
             while(this.readyToWrite == false){
@@ -144,10 +142,10 @@ public class Streamer{
             }
             this.readyToWrite = false;
             notifyAll();
-            Message m = new Message(this.msgIndex, code, originID, msgToWrite);
-            if(this.messageList.size() == LIST_MAX_SIZE)
-                this.messageList.removeFirst();
-            this.messageList.add(m);
+            Message m = new Message(this.msgIndex, originID, msgToWrite);
+            if(this.lastMessages.size() == LIST_MAX_SIZE)
+                this.lastMessages.removeFirst();
+            this.lastMessages.add(m);
             this.msgIndex = (this.msgIndex+1)%9999;
         } catch (InterruptedException e){
             System.out.println("Wait exception error when writing");
@@ -172,13 +170,13 @@ public class Streamer{
             System.out.println("Wait exception error when reading");
             e.printStackTrace();
         }
-        LinkedList<Message> list = (LinkedList<Message>)this.messageList.subList(this.messageList.size()-n, this.messageList.size());
+        LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(this.lastMessages.size()-n, this.lastMessages.size());
         return (Message [])list.toArray();
     }
     
-    public synchronized String readRandom(String code){
-        Message random = this.messageList.get(new Random().nextInt(this.messageList.size()+1));
-        return new Message(random.getMessageNumber(), code, random.getOriginID(), random.getMessage()).toString();
+    public synchronized String readRandom(){
+        Message random = this.lastMessages.get(new Random().nextInt(this.lastMessages.size()+1));
+        return new Message(random.getMessageNumber(), random.getOriginID(), random.getMessage()).toString();
     }
 
     @Override public String toString(){
@@ -187,12 +185,7 @@ public class Streamer{
     }
 
     public static void main(String[] args){
-        Streamer streamer = new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]));
-        streamer.registerToManager("lulu", 4442);
-        Thread t1 = new Thread(streamer.new StreamerTCP());
-        Thread t2 = new Thread(streamer.new StreamerUDP());
-        t1.start();
-        t2.start();
+       new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]));
     }
 
     private class StreamManagerCommunication implements Runnable {
@@ -298,7 +291,7 @@ public class Streamer{
                                     Message[] history = Streamer.this.read(n);
                                     for(Message m : history)
                                     {
-                                        pw.print(m.toString());
+                                        pw.print("OLDM " + m.toString());
                                         pw.flush();
                                     }
                                     pw.print("ENDM\r\n");
@@ -306,12 +299,14 @@ public class Streamer{
                                     break;
                                 }
                             }
-                        } else if(query[0].equals("MESS")){
+                        } 
+                        else if(query[0].equals("MESS"))
+                        {
                             if(query.length != 3) {
                                 pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
                             } else {
-                                if(Streamer.this.write(query[0], query[1], query[2]) == false){
+                                if(Streamer.this.write(query[1], query[2]) == false){
                                     pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                     pw.flush();
                                 }
@@ -339,6 +334,7 @@ public class Streamer{
     private class StreamerUDP implements Runnable{
 
         private DatagramSocket dso;
+        private TimerTask task;
 
         public StreamerUDP(){
             try {
@@ -349,11 +345,11 @@ public class Streamer{
         }
 
         @Override public void run(){
-            TimerTask task = new TimerTask()
+            task = new TimerTask()
             {
                 @Override public void run(){
                     try{
-                        byte[] packet = readRandom("DIFF").getBytes();
+                        byte[] packet = ("DIFF " + readRandom()).getBytes();
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);
                     } catch(IOException e){
