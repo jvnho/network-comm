@@ -41,7 +41,7 @@ public class Test{
         public void run(){
             try{
                 PrintWriter sender = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-                sender.println("REGI diffprof 225.010.020.030 4999 192.168.070.236 5999\r");
+                sender.println("REGI diffprof 225.010.020.030 4949 192.168.070.236 5999\r");
                 sender.flush();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String recu = reader.readLine();

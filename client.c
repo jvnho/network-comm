@@ -7,6 +7,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <pthread.h>
 #include "client.h"
 //return len, or -1 if bad format
 int getLen(char *message){
@@ -89,87 +92,81 @@ int parseStreamer(infoStreamer *result, char *streamer){
     }
     return 0;
 }
+int countPrefixZero(char *paquet){
+    int compt = 0;
+    for(int i=0; i<3; i++){
+        if(paquet[i]!='0')return compt;
+        compt++;
+    }
+    return compt;
+}
+void removeZeroIp(char *origin, char *copie){
+    char source[16];
+    memset(source, 0, 16);
+    memcpy(source, origin, 16);
+    int startCopy = 0;//jamais sur le point
+    int startSource = 0;//where we will put the point
+    int i_paquet = 0;
+    char * tok = strtok(origin, ".");
+
+    while(tok != NULL ) {
+        int nbzero = countPrefixZero(tok);
+        if(nbzero == 0){ //all the digit to  .
+            memcpy(copie+startCopy, source+startCopy, 4);
+            startCopy += 4;
+            startSource += 4;
+        }else if(nbzero == 1){//from firt not zero to .
+            memcpy(copie+startCopy, source+startSource+1, 3);
+            startCopy += 3;
+            startSource += 4;
+        }else if(nbzero == 2 || nbzero == 3){
+            memcpy(copie+startCopy, source+startSource+2, 2);
+            startCopy += 2;
+            startSource += 4;
+        }
+        tok = strtok(NULL, ".");
+    }
+}
 //save a socket associated with a streamer
 int subscribe(char *streamer){
-    printf("debut\n");
+    //parse the streamer buffer
+    infoStreamer result;
+    memset(&result, 0, sizeof(infoStreamer));
+    if(parseStreamer(&result, streamer)==-1)return -1;
+    char reformatedIp[16];
+    memset(reformatedIp, 0, 16);
+    removeZeroIp(result.multicatIP, reformatedIp);//changing the format of ip
+    printf("port multi = %d\n", result.multicastPort);
+    printf("ip multi = -%s-\n", reformatedIp);
+
+    //preparing the socket to listen
     int sock=socket(PF_INET,SOCK_DGRAM,0);
     int ok=1;
     int r=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&ok,sizeof(ok));
     struct sockaddr_in address_sock;
     address_sock.sin_family=AF_INET;
-    address_sock.sin_port=htons(4999);
+    address_sock.sin_port=htons(result.multicastPort);
     address_sock.sin_addr.s_addr=htonl(INADDR_ANY);
     r=bind(sock,(struct sockaddr *)&address_sock,sizeof(struct sockaddr_in));
     struct ip_mreq mreq;
-    mreq.imr_multiaddr.s_addr=inet_addr("225.010.020.030");
+    mreq.imr_multiaddr.s_addr=inet_addr(reformatedIp);
     mreq.imr_interface.s_addr=htonl(INADDR_ANY);
     r=setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&mreq,sizeof(mreq));
-    char tampon[100];
-    while(1){
-        int rec=recv(sock,tampon,100,0);
-        tampon[rec]='\0';
-        printf("Message recu : %s\n",tampon);
-    }
-    return 0;
-    /*
-    printf("%s\n", streamer);
-    //parse the streamer buffer
-    infoStreamer result;
-    memset(&result, 0, sizeof(infoStreamer));
-    if(parseStreamer(&result, streamer)==-1)return -1;
-    printf("port multi = %d\n", result.multicastPort);
-    printf("ip multi = -%s-\n", result.multicatIP);
-
-
-    
-    
-    //create the soc
-    int sock=socket(PF_INET, SOCK_DGRAM, 0);
-    if(sock == -1){
-        printf("error: client failed to subscribe\n");
-        return -1;
-    }
-    //make reusable
-    int parameter=1;
-    int test=setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &parameter, sizeof(parameter));
-    if(test == -1){
-        printf("error: failed to setup socket(reusable)\n");
-        return -1;
-    }
-    //create a address in order to listen
-    struct sockaddr_in addr;
-    addr.sin_family=AF_INET;
-    addr.sin_port=htons(result.multicastPort);
-    addr.sin_addr.s_addr=htonl(INADDR_ANY);
-    int b = bind(sock,(struct sockaddr *)&addr,sizeof(struct sockaddr_in));
-    if(b == -1){
-        printf("failed to bind\n");
-        return -1;
-    }
-    //set up the info for the registration
-    struct ip_mreq req;
-    memset(&req, 0, sizeof(struct ip_mreq));
-    req.imr_multiaddr.s_addr = inet_addr(result.multicatIP);
-    req.imr_interface.s_addr=htonl(INADDR_ANY);
-    b = setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&req,sizeof(req));
-    if(b == -1){
-        printf("error: failed to setup socket(subscribe)\n");
-        return -1;
-    }
+    return sock;
+}
+void * printMessage(void *s){
+    int fd = open("reception.txt", O_WRONLY|O_CREAT, 0666);
+    int soc = *((int *)s);
     char tampon[162];
     while(1){
-        int rec=recv(sock,tampon,161,0);
+        memset(tampon, 0, 162);
+        int rec=recv(soc,tampon,161,0);
         tampon[rec]='\0';
-        printf("Message recu : %s\n",tampon);
+        write(fd, tampon, 161);
     }
-    return sock;
-    */
-    return 0;
+    return NULL;
 }
 int main(void){
-    char test[130] = "ITEM diffprof 225.010.020.030 4999 192.168.070.236 5999\r\n";
-    subscribe(test);
-    /*
     client c;
     memset(&c, 0, sizeof(client));
     memcpy(c.id, "abcdef78", sizeof(char)*strlen("abcdef78"));
@@ -180,7 +177,7 @@ int main(void){
     char result[99][58];
     for(int i = 0; i<58; i++)memset(result[i], 0, 58);
     int len = 0;
-    //gestionaire sur lulu, port 4141
+    //gestionaire sur lulu, port 4141 ####### a mettre dans le fichier config
     int test = getListStreamer("192.168.70.236", 4141, result, &len); //passer en argument grace au fichier de config(gestionnaire)
     if(test == -1){
         printf("failed to get list\n");
@@ -194,6 +191,7 @@ int main(void){
         }
     }
     printf("_______________________\n\n");
+
     //subscribe to streamer
     printf("chose the index of streamer: \n\n");
     int index = 0;
@@ -203,20 +201,17 @@ int main(void){
     index = atoi(buff);
     int soc = subscribe(result[index]);
     if(soc == -1)return -1;
-    char received[162];
-    int r = 0;
-    printf("fini de subscribe\n");
-    while(1){
-        memset(received, 0, 162);
-        r = recv(soc, received, 161, 0);
-        printf("apres receiv\n");
-        if(r == -1){
-            printf("end of reception\n");
-            break;
-        }
-        printf("%s\n", received);
+
+    //create thread to print the message received on the socket
+    pthread_t thread_print;
+    int printing = pthread_create(&thread_print, NULL, printMessage, &soc);
+    if(printing != 0){
+        printf("error: can't create thread to print\n");
+        close(soc);
+        return -1;
     }
-    */
-    
-    return 0;
+    //other interation wiht the streamer 
+    while(1){
+        1+1;
+    }
 }
