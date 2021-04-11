@@ -128,16 +128,11 @@ void removeZeroIp(char *origin, char *copie){
     }
 }
 //save a socket associated with a streamer
-int subscribe(char *streamer){
+int subscribe(infoStreamer info){
     //parse the streamer buffer
-    infoStreamer result;
-    memset(&result, 0, sizeof(infoStreamer));
-    if(parseStreamer(&result, streamer)==-1)return -1;
     char reformatedIp[16];
     memset(reformatedIp, 0, 16);
-    removeZeroIp(result.multicatIP, reformatedIp);//changing the format of ip
-    printf("port multi = %d\n", result.multicastPort);
-    printf("ip multi = -%s-\n", reformatedIp);
+    removeZeroIp(info.multicatIP, reformatedIp);//changing the format of ip
 
     //preparing the socket to listen
     int sock=socket(PF_INET,SOCK_DGRAM,0);
@@ -145,7 +140,7 @@ int subscribe(char *streamer){
     int r=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&ok,sizeof(ok));
     struct sockaddr_in address_sock;
     address_sock.sin_family=AF_INET;
-    address_sock.sin_port=htons(result.multicastPort);
+    address_sock.sin_port=htons(info.multicastPort);
     address_sock.sin_addr.s_addr=htonl(INADDR_ANY);
     r=bind(sock,(struct sockaddr *)&address_sock,sizeof(struct sockaddr_in));
     struct ip_mreq mreq;
@@ -165,6 +160,14 @@ void * printMessage(void *s){
         write(fd, tampon, 161);
     }
     return NULL;
+}
+void printList(){
+    char number[4];
+    memset(number, 0, 4);
+    printf("Give a number betwen 0 and 999\n\n");
+    int len = read(1, number, 3);
+    number[len-1]='\0';
+    int n = atoi(number);
 }
 int main(void){
     client c;
@@ -199,7 +202,11 @@ int main(void){
     memset(buff, 0, 2);
     read(1, buff, 3);
     index = atoi(buff);
-    int soc = subscribe(result[index]);
+    //parse the streamer buffer
+    infoStreamer stream;
+    memset(&stream, 0, sizeof(infoStreamer));
+    if(parseStreamer(&stream, result[index])==-1)return -1;
+    int soc = subscribe(stream);
     if(soc == -1)return -1;
 
     //create thread to print the message received on the socket
@@ -211,7 +218,18 @@ int main(void){
         return -1;
     }
     //other interation wiht the streamer 
+    char request[4];
+    int t = 0;
     while(1){
-        1+1;
+        memset(request, 0, 4);
+        t = read(1, request, 3);
+        request[t-1] = '\0';
+        if(strcmp(request, "m") == 0){
+            printf("envoyer un message\n");
+        }else if(strcmp(request, "l")==0){
+            printf("demande et affiche liste\n");
+        }else{
+            printf("Unown entry\n");
+        }
     }
 }
