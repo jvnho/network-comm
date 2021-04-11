@@ -323,7 +323,7 @@ public class Streamer{
                                     Message[] history = Streamer.this.read(n);
                                     for(Message m : history)
                                     {
-                                        pw.print("OLDM " + m.toString()); //TODO: remettre dans Message l'index du message
+                                        pw.print("OLDM " + m.toString());
                                         pw.flush();
                                     }
                                     pw.print("ENDM\r\n");
@@ -394,8 +394,9 @@ public class Streamer{
                         } else { //sinon on diffuse un message ordinaire du diffuseur
                             m = readFileMessage();
                         }
+                        m.setIndex((StreamerUDP.this.index++)%9999);
                         Streamer.this.addToHistory(m);
-                        String s = ("DIFF " + (StreamerUDP.this.index++)%9999 + " " + m.toString());
+                        String s = ("DIFF " + m.toString());
                         byte[] packet = s.getBytes();
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);

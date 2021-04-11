@@ -1,9 +1,16 @@
 public class Message {
 
+    private int index;
     private String originID;
     private String message;
 
     public Message(String originID, String message){
+        this.originID = originID;
+        initMessage(message);
+    }
+
+    public Message(int index, String originID, String message){
+        this.index = index;
         this.originID = originID;
         initMessage(message);
     }
@@ -21,7 +28,11 @@ public class Message {
     }
 
     @Override public String toString(){
-        return this.originID + " " + this.message;
+        return this.index + " " + this.originID + " " + this.message;
+    }
+
+    public void setIndex(int index){
+        this.index = index;
     }
 
     public String getOriginID(){
