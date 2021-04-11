@@ -1,7 +1,6 @@
 import java.net.*;
 import java.io.*;
 import java.util.LinkedList;
-import java.util.Random;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -19,7 +18,6 @@ public class Streamer{
     private String multicastIP;
     private int multicastPort;
     private String machineIP;
-    private int msgIndex;
     private LinkedList<Message> lastMessages;
     private BufferedReader msgFileReader;
 
@@ -82,8 +80,7 @@ public class Streamer{
         this.multicastIP = addressToFormat(multicastIP);
         try{
             String streamerAddr = InetAddress.getLocalHost().toString();
-            String s1 = streamerAddr.substring(streamerAddr.indexOf("/")+1);
-            s1.trim();
+            String s1 = streamerAddr.substring(streamerAddr.indexOf("/")+1).trim();
             streamerAddr = s1;
             this.machineIP = addressToFormat(streamerAddr);
         } catch(UnknownHostException e){
@@ -128,7 +125,6 @@ public class Streamer{
     public void initMessageList(String path){
         this.readyToWriteMessage = true;
         this.messageFromClient = Optional.empty();
-        this.msgIndex = 0;
         this.lastMessages = new LinkedList<Message>();
         try {
             File f = new File(path);
@@ -136,6 +132,7 @@ public class Streamer{
             this.msgFileReader = new BufferedReader(fr);
         } catch(FileNotFoundException e){
             System.out.println("Could not find messages file");
+            System.exit(0);
         }
 
     }
@@ -153,9 +150,10 @@ public class Streamer{
         }
         catch(UnknownHostException e){
             System.out.println("Error when creating socket.");
-            e.printStackTrace();
+            System.exit(0);
         } catch(IOException e){
-            e.printStackTrace();
+            System.out.println("IOException error when trying to register to stream manager");
+            System.exit(0);
         }
     }
 
@@ -184,9 +182,29 @@ public class Streamer{
         return (Message [])list.toArray();
     }
     
-    public synchronized String readFileMessage(){
-        Message random = this.lastMessages.get(new Random().nextInt(this.lastMessages.size()+1));
-        return new Message(random.getMessageNumber(), random.getOriginID(), random.getMessage()).toString();
+    public Message readFileMessage(){
+        String s;
+        try {
+            if((s = this.msgFileReader.readLine()) != null){
+                Message read = new Message(this.id, s);
+                return read;
+            }
+            //sinon on a atteint la fin du fichier donc un réinitialise le buffer et on appelle récursivement cette fonction
+            this.msgFileReader.mark(0);
+            this.msgFileReader.reset();
+        } catch(IOException e){
+            System.out.println("IOException when trying to read file message content");
+            System.exit(0);
+        }
+        
+        return this.readFileMessage();
+    }
+
+    public void addToHistory(Message m){
+        if(this.lastMessages.size() == LIST_MAX_SIZE){
+            this.lastMessages.removeLast();
+        }
+        this.lastMessages.addFirst(m);
     }
 
     @Override public String toString(){
@@ -305,7 +323,7 @@ public class Streamer{
                                     Message[] history = Streamer.this.read(n);
                                     for(Message m : history)
                                     {
-                                        pw.print("OLDM " + m.toString());
+                                        pw.print("OLDM " + m.toString()); //TODO: remettre dans Message l'index du message
                                         pw.flush();
                                     }
                                     pw.print("ENDM\r\n");
@@ -350,9 +368,11 @@ public class Streamer{
 
         private DatagramSocket dso;
         private TimerTask task;
+        private int index;
 
         public StreamerUDP(){
             try {
+                this.index = 0;
                 this.dso = new DatagramSocket();
             } catch(SocketException e){
                 System.out.println("Could not create a DatagramSocket");
@@ -365,7 +385,18 @@ public class Streamer{
             {
                 @Override public void run(){
                     try{
-                        byte[] packet = ("DIFF " + readFileMessage()).getBytes();
+                        Message m;
+                        if(Streamer.this.messageFromClient.isPresent()) //s'il y a message qu'un client veut faire diffuser
+                        {
+                            m = Streamer.this.messageFromClient.get();
+                            Streamer.this.messageFromClient = Optional.empty();
+                            Streamer.this.readyToWriteMessage = true;
+                        } else { //sinon on diffuse un message ordinaire du diffuseur
+                            m = readFileMessage();
+                        }
+                        Streamer.this.addToHistory(m);
+                        String s = ("DIFF " + (StreamerUDP.this.index++)%9999 + " " + m.toString());
+                        byte[] packet = s.getBytes();
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);
                     } catch(IOException e){
