@@ -112,7 +112,7 @@ void removeZeroIp(char *origin, char *copie){
     while(tok != NULL ) {
         int nbzero = countPrefixZero(tok);
         if(nbzero == 0){ //all the digit to  .
-            memcpy(copie+startCopy, source+startCopy, 4);
+            memcpy(copie+startCopy, source+startSource, 4);
             startCopy += 4;
             startSource += 4;
         }else if(nbzero == 1){//from firt not zero to .
@@ -161,19 +161,70 @@ void * printMessage(void *s){
     }
     return NULL;
 }
-void printList(){
+void addZero(int n, char *result){
+    sprintf(result, "%d", n);
+    
+    int len = strlen(result);
+    if(len == 1){
+        sprintf(result, "00%d", n);
+    }else if(len == 2){
+        sprintf(result, "0%d", n);
+    }
+    printf("%s\n", result);
+}
+int printList(infoStreamer info){
+    //remove unecessary zero in address
+    char reformatedIp[16];
+    memset(reformatedIp, 0, 16);
+    removeZeroIp(info.streamerIP, reformatedIp);//changing the format of ip
+    //get number from user
     char number[4];
     memset(number, 0, 4);
-    printf("Give a number betwen 0 and 999\n\n");
+    printf("\nGive a number betwen 0 and 999\n\n");
     int len = read(1, number, 3);
     number[len-1]='\0';
     int n = atoi(number);
+    //setup socket
+    int soc = socket(PF_INET, SOCK_STREAM, 0);
+    if(soc == -1){
+        printf("error(printList) : can't create socket to get the list of n message\n");
+        return -1;
+    }
+    struct sockaddr_in adress_sock;
+    adress_sock.sin_family = AF_INET;
+    printf("port = %d\n", info.tcpPort);
+    adress_sock.sin_port = htons(info.tcpPort);
+    printf("reformated = %s\n", reformatedIp);
+    inet_aton(reformatedIp, &adress_sock.sin_addr);
+
+    int c=connect(soc,(struct sockaddr *)&adress_sock,
+                sizeof(struct sockaddr_in));
+    if(c == -1){
+        printf("error(printList) : client can't connect\n");
+        return -1;
+    }
+    //communication
+    char message[11];
+    memset(message, 0, 11);
+    memset(number, 0, 4);
+    addZero(n, number);
+    sprintf(message, "LAST %s\r\n", number);
+    printf("%s\n", message);
+    //send(soc, message, 10, 0);//a tester
+    send(soc, message, strlen(message), 0);
+    char tampon[162];
+    for(int i = 0; i<n; i++){
+        memset(tampon, 0, 162);
+        int rec=recv(soc, tampon, 161, 0);
+        tampon[rec]='\0';
+        printf("%s\n", tampon);
+    }
 }
 int main(void){
     client c;
     memset(&c, 0, sizeof(client));
     memcpy(c.id, "abcdef78", sizeof(char)*strlen("abcdef78"));
-    printf("client : %s\n\n", c.id);
+    printf("\nclient : %s\n\n", c.id);
     printf("_______________________\n\n");
     printf("Streamer List:\n\n");
     //showing the list of streamer from StreamerManager
@@ -202,6 +253,7 @@ int main(void){
     memset(buff, 0, 2);
     read(1, buff, 3);
     index = atoi(buff);
+    
     //parse the streamer buffer
     infoStreamer stream;
     memset(&stream, 0, sizeof(infoStreamer));
@@ -210,26 +262,31 @@ int main(void){
     if(soc == -1)return -1;
 
     //create thread to print the message received on the socket
+    /*
     pthread_t thread_print;
     int printing = pthread_create(&thread_print, NULL, printMessage, &soc);
     if(printing != 0){
         printf("error: can't create thread to print\n");
         close(soc);
         return -1;
-    }
+    }*/
+
     //other interation wiht the streamer 
     char request[4];
     int t = 0;
     while(1){
+        printf("_______________________\n\n");
+        printf("(l) List    (m) Message\n\n");
         memset(request, 0, 4);
         t = read(1, request, 3);
         request[t-1] = '\0';
         if(strcmp(request, "m") == 0){
             printf("envoyer un message\n");
         }else if(strcmp(request, "l")==0){
-            printf("demande et affiche liste\n");
+            printList(stream);
         }else{
             printf("Unown entry\n");
         }
     }
+    return 0;
 }
