@@ -5,6 +5,7 @@ import java.util.Random;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Optional;
 
 //nicolas 239.255.255.255 5452 7879
 
@@ -20,25 +21,41 @@ public class Streamer{
     private String machineIP;
     private int msgIndex;
     private LinkedList<Message> lastMessages;
-    private boolean readyToWrite;
+    private BufferedReader msgFileReader;
 
-    public Streamer(String id, String multicastIP, int multicastPort, int userPort){
+    private boolean readyToWriteMessage;
+    private Optional<Message> messageFromClient;
+
+    private StreamerTCP streamerTCP;
+    private StreamerUDP streamerUDP;
+
+    public Streamer(String id, String multicastIP, int multicastPort, int userPort, String path){
         initStreamerID(id);
-        initMessageList();
+        initMessageList(path);
         initPorts(multicastPort, userPort);
         initAdresses(multicastIP);
         registerToManager("lulu", 4442);
-        Thread t1 = new Thread(this.new StreamerTCP());
-        Thread t2 = new Thread(this.new StreamerUDP());
-        t1.start();
-        t2.start();
+        initTCPCommunication();
+        initMulticastDiffusion();
     }   
+
+    public void initTCPCommunication(){
+        this.streamerTCP = new StreamerTCP();
+        Thread t1 = new Thread(this.streamerTCP);
+        t1.start();
+    }
+
+    public void initMulticastDiffusion(){
+        this.streamerUDP = new StreamerUDP();
+        Thread t2 = new Thread(this.streamerUDP);
+        t2.start();
+    }
 
     public String addressToFormat(String ip){
         String[] tokens = ip.split("\\.");
         if(tokens.length != 4){
             System.out.println("Incorrect IP address format.");
-            throw new IllegalArgumentException();
+            System.exit(0);
         }
         for(int i = 0; i < tokens.length; i++)
         {
@@ -49,13 +66,13 @@ public class Streamer{
                     continue;
                 else if (length > 3) {
                     System.out.println("Incorrect IP address format.");
-                    throw new IllegalArgumentException();
+                    System.exit(0);
                 } else {
                     tokens[i] = "0".repeat(3-length) + tokens[i];
                 }
             } else {
                 System.out.println("Incorrect IP address format.");
-                throw new IllegalArgumentException();
+                System.exit(0);
             }
         }
         return String.join(".", tokens);
@@ -71,7 +88,7 @@ public class Streamer{
             this.machineIP = addressToFormat(streamerAddr);
         } catch(UnknownHostException e){
             System.out.println("Error when retrieving streamer's ip address.");
-            e.printStackTrace();
+            System.exit(0);
         }           
     }
 
@@ -87,7 +104,7 @@ public class Streamer{
     public void initPorts(int multicastPort, int userPort){
         if(String.valueOf(multicastPort).length() != 4 || String.valueOf(userPort).length() != 4){
             System.out.println("Incorrect port format.");
-            throw new IllegalArgumentException();
+            System.exit(0);
         }
         this.multicastPort = multicastPort;
         this.userPort = userPort;
@@ -95,24 +112,32 @@ public class Streamer{
 
     public void initStreamerID(String s){
         if(s.equals("")){
-            System.out.println("");
-            throw new IllegalArgumentException();
+            System.out.println("Streamer's ID must not be empty");
+            System.exit(0);
         }
+        else if(s.length() > 8){
+            System.out.println("Streamer's ID must be less than 9 characters");
+            System.exit(0);
+        }    
         else if(s.length() == 8)
             this.id = s; 
         else
             this.id = s + "#".repeat(8 - s.length());
     }
 
-    public void initMessageList(){
+    public void initMessageList(String path){
+        this.readyToWriteMessage = true;
+        this.messageFromClient = Optional.empty();
         this.msgIndex = 0;
         this.lastMessages = new LinkedList<Message>();
-        for(int i = 0; i < messages.length; i++)
-        {
-            this.lastMessages.add(new Message(this.msgIndex, "DIFF", this.id, messages[i]));
-            this.msgIndex++;
+        try {
+            File f = new File(path);
+            FileReader fr = new FileReader(f);
+            this.msgFileReader = new BufferedReader(fr);
+        } catch(FileNotFoundException e){
+            System.out.println("Could not find messages file");
         }
-        this.readyToWrite = true;
+
     }
 
     public void registerToManager(String managerAddr, int managerPort){
@@ -137,19 +162,15 @@ public class Streamer{
     public synchronized boolean write(String originID, String msgToWrite){
         try 
         {
-            while(this.readyToWrite == false){
+            while(this.readyToWriteMessage == false){
                 wait();
             }
-            this.readyToWrite = false;
+            this.readyToWriteMessage = false;
+            this.messageFromClient = Optional.of(new Message(originID, msgToWrite));
             notifyAll();
-            Message m = new Message(this.msgIndex, originID, msgToWrite);
-            if(this.lastMessages.size() == LIST_MAX_SIZE)
-                this.lastMessages.removeFirst();
-            this.lastMessages.add(m);
-            this.msgIndex = (this.msgIndex+1)%9999;
         } catch (InterruptedException e){
             System.out.println("Wait exception error when writing");
-            return false;
+            System.exit(0);
         } 
         catch (IllegalArgumentException e){
             System.out.println("Error when trying to create a Message instance object");
@@ -159,22 +180,11 @@ public class Streamer{
     }
 
     public synchronized Message[] read(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
-        try
-        {
-            while(this.readyToWrite == true){
-                wait();
-            }
-            this.readyToWrite = true;
-            notifyAll();
-        } catch(InterruptedException e){
-            System.out.println("Wait exception error when reading");
-            e.printStackTrace();
-        }
         LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(this.lastMessages.size()-n, this.lastMessages.size());
         return (Message [])list.toArray();
     }
     
-    public synchronized String readRandom(){
+    public synchronized String readFileMessage(){
         Message random = this.lastMessages.get(new Random().nextInt(this.lastMessages.size()+1));
         return new Message(random.getMessageNumber(), random.getOriginID(), random.getMessage()).toString();
     }
@@ -185,7 +195,11 @@ public class Streamer{
     }
 
     public static void main(String[] args){
-       new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]));
+        if(args.length != 5 ){
+            System.out.println("Missing argument or incorrect format.");
+        } else {
+            new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]), args[4]);
+        }
     }
 
     private class StreamManagerCommunication implements Runnable {
@@ -226,7 +240,7 @@ public class Streamer{
                 }
             } catch (IOException e){
                 System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
-                e.printStackTrace();
+                System.exit(0);
             }
         }
     }
@@ -240,7 +254,7 @@ public class Streamer{
                 this.server = new ServerSocket(Streamer.this.userPort);
             } catch(IOException e){
                 System.out.println("Error when creating ServerSocket object instance.");
-                e.printStackTrace();
+                System.exit(0);
             }
         }
 
@@ -257,7 +271,7 @@ public class Streamer{
             }
             catch(IOException e){
                 System.out.println("Server attempt accepting connection error.");
-                e.printStackTrace();
+                System.exit(0);
             } 
         }
         
@@ -326,6 +340,7 @@ public class Streamer{
                 catch(IOException e){
                     System.out.println(e);
                     e.printStackTrace();
+                    System.exit(0);
                 }
             }
         }
@@ -341,6 +356,7 @@ public class Streamer{
                 this.dso = new DatagramSocket();
             } catch(SocketException e){
                 System.out.println("Could not create a DatagramSocket");
+                System.exit(0);
             }
         }
 
@@ -349,12 +365,12 @@ public class Streamer{
             {
                 @Override public void run(){
                     try{
-                        byte[] packet = ("DIFF " + readRandom()).getBytes();
+                        byte[] packet = ("DIFF " + readFileMessage()).getBytes();
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);
                     } catch(IOException e){
                         System.out.println("Streamer could not send package to subscribers");
-                        e.printStackTrace();
+                        System.exit(0);
                     }
                 }
             };

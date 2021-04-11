@@ -1,11 +1,9 @@
 public class Message {
-    
-    private int messageNumber;
+
     private String originID;
     private String message;
 
-    public Message(int messageNumber, String originID, String message){
-        this.messageNumber = messageNumber;
+    public Message(String originID, String message){
         this.originID = originID;
         initMessage(message);
     }
@@ -23,11 +21,7 @@ public class Message {
     }
 
     @Override public String toString(){
-        return this.messageNumber + " " + this.originID + " " + this.message;
-    }
-
-    public int getMessageNumber(){
-        return this.messageNumber;
+        return this.originID + " " + this.message;
     }
 
     public String getOriginID(){
