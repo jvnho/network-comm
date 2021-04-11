@@ -177,8 +177,8 @@ public class Streamer{
         return true;
     }
 
-    public synchronized Message[] read(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
-        LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(this.lastMessages.size()-n, this.lastMessages.size());
+    public Message[] readHistory(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
+        LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(0,n);
         return (Message [])list.toArray();
     }
     
@@ -320,15 +320,20 @@ public class Streamer{
                                     pw.flush();
                                 } else {
                                     int n = Integer.valueOf(query[1]);
-                                    Message[] history = Streamer.this.read(n);
-                                    for(Message m : history)
-                                    {
-                                        pw.print("OLDM " + m.toString());
+                                    if(n < 0 || n > LIST_MAX_SIZE){
+                                        pw.print("Must be positive and less than " + LIST_MAX_SIZE+"\r\n");
                                         pw.flush();
+                                    } else {
+                                        Message[] history = Streamer.this.readHistory(n);
+                                        for(Message m : history)
+                                        {
+                                            pw.print("OLDM " + m.toString());
+                                            pw.flush();
+                                        }
+                                        pw.print("ENDM\r\n");
+                                        pw.flush();
+                                        break;
                                     }
-                                    pw.print("ENDM\r\n");
-                                    pw.flush();
-                                    break;
                                 }
                             }
                         } 
