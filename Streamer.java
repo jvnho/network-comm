@@ -179,14 +179,13 @@ public class Streamer{
         return true;
     }
 
-    public Message[] readHistory(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
-        //TODO: erreur lors de execution
+    public LinkedList<Message> readHistory(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
         if(n > this.lastMessages.size()){
             LinkedList<Message> list = this.lastMessages;
-            return (Message [])list.toArray();
+            return list;
         } else {
-            LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(0,n);
-            return (Message [])list.toArray();
+            LinkedList<Message> list = new LinkedList<>(this.lastMessages.subList(0,n));
+            return list;
         }
     }
     
@@ -330,7 +329,7 @@ public class Streamer{
                                         pw.print("Must be positive and less than " + (LIST_MAX_SIZE-1)+"\r\n");
                                         pw.flush();
                                     } else {
-                                        Message[] history = Streamer.this.readHistory(n);
+                                        LinkedList<Message> history = Streamer.this.readHistory(n);
                                         for(Message m : history)
                                         {
                                             pw.print("OLDM " + m.toString());
