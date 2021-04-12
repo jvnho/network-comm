@@ -6,7 +6,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.Optional;
 
-//nicolas 239.255.255.255 5452 7879
+//execution: java Streamer nicolas 239.255.255.255 4242 5252 streamer_msg
 
 public class Streamer{
     
@@ -21,6 +21,7 @@ public class Streamer{
     private LinkedList<Message> lastMessages;
     private BufferedReader msgFileReader;
 
+    private String pathToMsgFile;
     private boolean readyToWriteMessage;
     private Optional<Message> messageFromClient;
 
@@ -30,9 +31,10 @@ public class Streamer{
     public Streamer(String id, String multicastIP, String multicastPort, String userPort, String path){
         initStreamerID(id);
         initMessageList(path);
+        this.pathToMsgFile = path;
         initPorts(multicastPort, userPort);
         initAdresses(multicastIP);
-        registerToManager("lulu", 4442);
+        //registerToManager("lulu", 4442);
         initTCPCommunication();
         initMulticastDiffusion();
     }   
@@ -149,7 +151,7 @@ public class Streamer{
 
         }
         catch(UnknownHostException e){
-            System.out.println("Error when creating socket.");
+            System.out.println("Error when creating socket to communicate with manager");
             System.exit(0);
         } catch(IOException e){
             System.out.println("IOException error when trying to register to stream manager");
@@ -178,6 +180,7 @@ public class Streamer{
     }
 
     public Message[] readHistory(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
+        //TODO: erreur lors de execution
         if(n > this.lastMessages.size()){
             LinkedList<Message> list = this.lastMessages;
             return (Message [])list.toArray();
@@ -195,13 +198,13 @@ public class Streamer{
                 return read;
             }
             //sinon on a atteint la fin du fichier donc un réinitialise le buffer et on appelle récursivement cette fonction
-            this.msgFileReader.mark(0);
-            this.msgFileReader.reset();
+            this.msgFileReader = new BufferedReader(new FileReader(new File(this.pathToMsgFile)));
         } catch(IOException e){
             System.out.println("IOException when trying to read file message content");
             System.exit(0);
         }
         return this.readFileMessage();
+
     }
 
     public void addToHistory(Message m){
