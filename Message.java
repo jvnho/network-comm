@@ -1,6 +1,6 @@
 public class Message {
 
-    private int index;
+    private String index;
     private String originID;
     private String message;
 
@@ -9,17 +9,11 @@ public class Message {
         initMessage(message);
     }
 
-    public Message(int index, String originID, String message){
-        this.index = index;
-        this.originID = originID;
-        initMessage(message);
-    }
-
     public void initMessage(String message){
         int strLength = message.length();
         String newMessage = "";
         if(message.charAt(strLength-1) == '\n' && message.charAt(strLength-2) == '\r'){
-            newMessage = message.substring(0, strLength);
+            newMessage = message.substring(0, strLength-2);
         }
         if(newMessage.length() > 140){
             throw new IllegalArgumentException();
@@ -32,7 +26,12 @@ public class Message {
     }
 
     public void setIndex(int index){
-        this.index = index;
+        String s = String.valueOf(index);
+        if(s.length() != 4){
+            this.index = "0".repeat(4 - s.length()) + s;
+        } else {
+            this.index = s;
+        }
     }
 
     public String getOriginID(){
