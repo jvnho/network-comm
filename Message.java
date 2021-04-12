@@ -14,6 +14,8 @@ public class Message {
         String newMessage = "";
         if(message.charAt(strLength-1) == '\n' && message.charAt(strLength-2) == '\r'){
             newMessage = message.substring(0, strLength-2);
+        } else {
+            newMessage = message;
         }
         if(newMessage.length() > 140){
             throw new IllegalArgumentException();
