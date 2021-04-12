@@ -27,7 +27,7 @@ public class Streamer{
     private StreamerTCP streamerTCP;
     private StreamerUDP streamerUDP;
 
-    public Streamer(String id, String multicastIP, int multicastPort, int userPort, String path){
+    public Streamer(String id, String multicastIP, String multicastPort, String userPort, String path){
         initStreamerID(id);
         initMessageList(path);
         initPorts(multicastPort, userPort);
@@ -98,13 +98,13 @@ public class Streamer{
         return true;
     }
 
-    public void initPorts(int multicastPort, int userPort){
-        if(String.valueOf(multicastPort).length() != 4 || String.valueOf(userPort).length() != 4){
+    public void initPorts(String multicastPort, String userPort){
+        if(multicastPort.length() != 4 || userPort.length() != 4 || !isNumber(multicastPort) || !isNumber(userPort)){
             System.out.println("Incorrect port format.");
             System.exit(0);
         }
-        this.multicastPort = multicastPort;
-        this.userPort = userPort;
+        this.multicastPort = Integer.parseInt(multicastPort);
+        this.userPort = Integer.parseInt(userPort);
     }
 
     public void initStreamerID(String s){
@@ -113,7 +113,7 @@ public class Streamer{
             System.exit(0);
         }
         else if(s.length() > 8){
-            System.out.println("Streamer's ID must be less than 9 characters");
+            System.out.println("Streamer's ID must be less than 8 characters");
             System.exit(0);
         }    
         else if(s.length() == 8)
@@ -178,8 +178,13 @@ public class Streamer{
     }
 
     public Message[] readHistory(int n){ //retrieve the last n elements on this.msgList and convert it into a java array
-        LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(0,n);
-        return (Message [])list.toArray();
+        if(n > this.lastMessages.size()){
+            LinkedList<Message> list = this.lastMessages;
+            return (Message [])list.toArray();
+        } else {
+            LinkedList<Message> list = (LinkedList<Message>)this.lastMessages.subList(0,n);
+            return (Message [])list.toArray();
+        }
     }
     
     public Message readFileMessage(){
@@ -196,7 +201,6 @@ public class Streamer{
             System.out.println("IOException when trying to read file message content");
             System.exit(0);
         }
-        
         return this.readFileMessage();
     }
 
@@ -216,7 +220,7 @@ public class Streamer{
         if(args.length != 5 ){
             System.out.println("Missing argument or incorrect format.");
         } else {
-            new Streamer(args[0], args[1], Integer.parseInt(args[2]), Integer.parseInt(args[3]), args[4]);
+            new Streamer(args[0], args[1], args[2], args[3], args[4]);
         }
     }
 
@@ -244,7 +248,6 @@ public class Streamer{
                     while(true)
                     {
                         recv = br.readLine();
-                        System.out.println(recv);
                         if(recv.equals("RUOK"))
                         { 
                             pw.print("IMOK\r\n");
@@ -321,7 +324,7 @@ public class Streamer{
                                 } else {
                                     int n = Integer.valueOf(query[1]);
                                     if(n < 0 || n > LIST_MAX_SIZE){
-                                        pw.print("Must be positive and less than " + LIST_MAX_SIZE+"\r\n");
+                                        pw.print("Must be positive and less than " + (LIST_MAX_SIZE-1)+"\r\n");
                                         pw.flush();
                                     } else {
                                         Message[] history = Streamer.this.readHistory(n);
@@ -343,7 +346,7 @@ public class Streamer{
                                 pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
                             } else {
-                                if(Streamer.this.write(query[1], query[2]) == false){
+                                if(Streamer.this.write(query[1], query[2]) == false){ //TODO: vérifier la taille de l'id du client ?
                                     pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                     pw.flush();
                                 }
