@@ -172,6 +172,48 @@ void addZero(int n, char *result){
     }
     printf("%s\n", result);
 }
+void fillRandomMessage(char *quote){
+    for(int i=0; i<140; i++){
+        quote[i]='a';
+    }
+    quote[140]='\0';
+}
+int sendMessage(infoStreamer info, char *id){
+    //remove unecessary zero in address
+    char reformatedIp[16];
+    memset(reformatedIp, 0, 16);
+    removeZeroIp(info.streamerIP, reformatedIp);//changing the format of ip
+
+    //setup socket
+    int soc = socket(PF_INET, SOCK_STREAM, 0);
+    if(soc == -1){
+        printf("error(printList) : can't create socket to get the list of n message\n");
+        return -1;
+    }
+    struct sockaddr_in adress_sock;
+    adress_sock.sin_family = AF_INET;
+    adress_sock.sin_port = htons(info.tcpPort);
+    inet_aton(reformatedIp, &adress_sock.sin_addr);
+
+    int c=connect(soc,(struct sockaddr *)&adress_sock,
+                sizeof(struct sockaddr_in));
+    if(c == -1){
+        printf("error(sendMessage) : client can't connect\n");
+        return -1;
+    }
+    char message[157];
+    memset(message, 0, 157);
+    char quote[141];
+    memset(message, 0, 141);
+    fillRandomMessage(quote);
+    sprintf(message, "MESS %s %s\r\n", id, quote);
+    send(soc, message, 156, 0);
+    char retour[5];
+    memset(retour, 0, 5);
+    recv(soc, retour, 4, 0);
+    printf("%s\n", retour);
+}
+//ask and print the last n message
 int printList(infoStreamer info){
     //remove unecessary zero in address
     char reformatedIp[16];
@@ -262,14 +304,13 @@ int main(void){
     if(soc == -1)return -1;
 
     //create thread to print the message received on the socket
-    /*
     pthread_t thread_print;
     int printing = pthread_create(&thread_print, NULL, printMessage, &soc);
     if(printing != 0){
         printf("error: can't create thread to print\n");
         close(soc);
         return -1;
-    }*/
+    }
 
     //other interation wiht the streamer 
     char request[4];
@@ -281,7 +322,7 @@ int main(void){
         t = read(1, request, 3);
         request[t-1] = '\0';
         if(strcmp(request, "m") == 0){
-            printf("envoyer un message\n");
+            sendMessage(stream, c.id);
         }else if(strcmp(request, "l")==0){
             printList(stream);
         }else{
