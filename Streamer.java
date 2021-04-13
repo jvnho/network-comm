@@ -313,18 +313,19 @@ public class Streamer{
                     PrintWriter pw = new PrintWriter(new OutputStreamWriter(this.socket.getOutputStream()));
                     while(true)
                     {
-                        String[] query = br.readLine().split(" ");
-                        if(query[0].equals("LAST"))
+                        String query = br.readLine();
+                        String[] tokens = query.split(" ");
+                        if(tokens[0].equals("LAST"))
                         {
-                            if(query.length != 2){
+                            if(tokens.length != 2){
                                 pw.print("Incorrect LAST argument format.\r\n");
                                 pw.flush();
                             } else {
-                                if(!isNumber(query[1])){
+                                if(!isNumber(tokens[1])){
                                     pw.print("Incorrect number format.\r\n");
                                     pw.flush();
                                 } else {
-                                    int n = Integer.valueOf(query[1]);
+                                    int n = Integer.valueOf(tokens[1]);
                                     if(n < 0 || n > LIST_MAX_SIZE){
                                         pw.print("Must be positive and less than " + (LIST_MAX_SIZE-1)+"\r\n");
                                         pw.flush();
@@ -342,19 +343,21 @@ public class Streamer{
                                 }
                             }
                         } 
-                        else if(query[0].equals("MESS"))
+                        else if(tokens[0].equals("MESS"))
                         {
-                            if(query.length != 3) {
+                            if(tokens.length < 3) {
                                 pw.print("Incorrect MESS format.\r\n");
                                 pw.flush();
                             } else {
-                                if(Streamer.this.write(query[1], query[2]) == false){ //TODO: vérifier la taille de l'id du client ?
+                                if(Streamer.this.write(tokens[1], query.substring(14)) == false){ //TODO: vérifier la taille de l'id du client ?
                                     pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                     pw.flush();
+                                } else {
+                                    System.out.println("true");
+                                    pw.print("ACKM\r\n");
+                                    pw.flush();
+                                    break;
                                 }
-                                pw.print("ACKM\r\n");
-                                pw.flush();
-                                break;
                             }
                         } else{
                             pw.print("Command not found.\r\n");
@@ -366,7 +369,7 @@ public class Streamer{
                     socket.close();
                 }
                 catch(IOException e){
-                    System.out.println(e);
+                    System.out.println("IOException ClientCommunication's runnable");
                     e.printStackTrace();
                     System.exit(0);
                 }
