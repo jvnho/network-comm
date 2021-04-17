@@ -28,16 +28,66 @@ public class Streamer{
     private StreamerTCP streamerTCP;
     private StreamerUDP streamerUDP;
 
-    public Streamer(String id, String multicastIP, String multicastPort, String userPort, String path){
-        initStreamerID(id);
-        initMessageList(path);
-        this.pathToMsgFile = path;
-        initPorts(multicastPort, userPort);
-        initAdresses(multicastIP);
-        //registerToManager("lulu", 4442);
+    public Streamer(String configFilePath, String messageFilePath){
+        parseConfigFile(configFilePath);
+        initMessageList(messageFilePath);
+        initStreamerAddr();
         initTCPCommunication();
         initMulticastDiffusion();
     }   
+
+    public void parseConfigFile(String path){
+        int ligneRead = 0;
+        try {
+            BufferedReader configFile = new BufferedReader(new FileReader(new File(path)));
+            String buffer;
+            while((buffer = configFile.readLine()) != null)
+            {
+                if(ligneRead == 0) //initialisation identifiant
+                    initStreamerID(buffer);
+                else if(ligneRead == 1) //initialisation adresse multidiffusion
+                    this.multicastIP = addressToFormat(buffer); //initialisation port multidiffusion
+                else if(ligneRead == 2)
+                {
+                    if(!isPortCorrect(buffer)){
+                        System.out.println("Port de multidiffusion incorrect");
+                        System.exit(0);
+                    }
+                    this.multicastPort = Integer.parseInt(buffer);
+                }
+                else if(ligneRead == 3) //initialisation port réception TCP
+                {
+                    if(!isPortCorrect(buffer)){
+                        System.out.println("Port de réception TCP incorrect");
+                        System.exit(0);
+                    }
+                    this.userPort = Integer.parseInt(buffer);
+                }
+                else if(ligneRead == 4) //initialisation adresse et port du gestionnaire
+                {
+                    String managerAddr = buffer; 
+                    String managerPort = configFile.readLine();
+                    if(!isPortCorrect(managerPort)){
+                        System.out.println("Port de gestionnaire incorrect");
+                        System.exit(0);
+                    }
+                    ligneRead++;
+                    registerToManager(managerAddr, Integer.parseInt(managerPort));
+                }
+                else if(ligneRead > 5){
+                    System.out.println("Incorrect config file format");
+                    System.exit(0);
+                }
+                ligneRead++;
+            }
+        } catch(FileNotFoundException e){
+            System.out.println("Error: file configuration not found");
+            System.exit(0);
+        } catch(IOException e){
+            System.out.println("Error when parsing config file.");
+            System.exit(0);
+        }
+    }
 
     public void initTCPCommunication(){
         this.streamerTCP = new StreamerTCP();
@@ -78,8 +128,7 @@ public class Streamer{
         return String.join(".", tokens);
     }
 
-    public void initAdresses(String multicastIP){
-        this.multicastIP = addressToFormat(multicastIP);
+    public void initStreamerAddr(){
         try{
             String streamerAddr = InetAddress.getLocalHost().toString();
             String s1 = streamerAddr.substring(streamerAddr.indexOf("/")+1).trim();
@@ -100,13 +149,10 @@ public class Streamer{
         return true;
     }
 
-    public void initPorts(String multicastPort, String userPort){
-        if(multicastPort.length() != 4 || userPort.length() != 4 || !isNumber(multicastPort) || !isNumber(userPort)){
-            System.out.println("Incorrect port format.");
-            System.exit(0);
-        }
-        this.multicastPort = Integer.parseInt(multicastPort);
-        this.userPort = Integer.parseInt(userPort);
+    public static boolean isPortCorrect(String port){
+        if(port.length() != 4 || !isNumber(port))
+            return false;
+        return true;
     }
 
     public void initStreamerID(String s){
@@ -125,6 +171,7 @@ public class Streamer{
     }
 
     public void initMessageList(String path){
+        this.pathToMsgFile = path;
         this.readyToWriteMessage = true;
         this.messageFromClient = Optional.empty();
         this.lastMessages = new LinkedList<Message>();
@@ -173,7 +220,7 @@ public class Streamer{
             System.exit(0);
         } 
         catch (IllegalArgumentException e){
-            System.out.println("Error when trying to create a Message instance object");
+            System.out.println("Error when trying to create a Message instance object: message too long !");
             return false;
         }
         return true;
@@ -202,6 +249,10 @@ public class Streamer{
             System.out.println("IOException when trying to read file message content");
             System.exit(0);
         }
+        catch(IllegalArgumentException e){
+            System.out.println("Error when trying to create a message: message too long !");
+            System.exit(0);
+        }
         return this.readFileMessage();
 
     }
@@ -219,10 +270,10 @@ public class Streamer{
     }
 
     public static void main(String[] args){
-        if(args.length != 5 ){
+        if(args.length != 2 ){
             System.out.println("Missing argument or incorrect format.");
         } else {
-            new Streamer(args[0], args[1], args[2], args[3], args[4]);
+            new Streamer(args[0], args[1]);
         }
     }
 
@@ -353,7 +404,6 @@ public class Streamer{
                                     pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                     pw.flush();
                                 } else {
-                                    System.out.println("true");
                                     pw.print("ACKM\r\n");
                                     pw.flush();
                                     break;
