@@ -21,6 +21,9 @@ public class Streamer{
     private LinkedList<Message> lastMessages;
     private BufferedReader msgFileReader;
 
+    private String managerAddr;
+    private int managerPort;
+
     private String pathToMsgFile;
     private boolean readyToWriteMessage;
     private Optional<Message> messageFromClient;
@@ -31,7 +34,8 @@ public class Streamer{
     public Streamer(String configFilePath, String messageFilePath){
         parseConfigFile(configFilePath);
         initMessageList(messageFilePath);
-        initStreamerAddr();
+        getStreamerAddr();
+        registerToManager(this.managerAddr, this.managerPort);
         initTCPCommunication();
         initMulticastDiffusion();
     }   
@@ -65,14 +69,14 @@ public class Streamer{
                 }
                 else if(ligneRead == 4) //initialisation adresse et port du gestionnaire
                 {
-                    String managerAddr = buffer; 
-                    String managerPort = configFile.readLine();
-                    if(!isPortCorrect(managerPort)){
+                    this.managerAddr = buffer; 
+                    String managerPortStr = configFile.readLine();
+                    if(!isPortCorrect(managerPortStr)){
                         System.out.println("Port de gestionnaire incorrect");
                         System.exit(0);
                     }
                     ligneRead++;
-                    registerToManager(managerAddr, Integer.parseInt(managerPort));
+                    this.managerPort = Integer.parseInt(managerPortStr);
                 }
                 else if(ligneRead > 5){
                     System.out.println("Incorrect config file format");
@@ -128,7 +132,7 @@ public class Streamer{
         return String.join(".", tokens);
     }
 
-    public void initStreamerAddr(){
+    public void getStreamerAddr(){
         try{
             String streamerAddr = InetAddress.getLocalHost().toString();
             String s1 = streamerAddr.substring(streamerAddr.indexOf("/")+1).trim();
@@ -195,7 +199,6 @@ public class Streamer{
             StreamManagerCommunication smc = new StreamManagerCommunication(managerSocket, br, pw);
             Thread t = new Thread(smc);
             t.start();
-
         }
         catch(UnknownHostException e){
             System.out.println("Error when creating socket to communicate with manager");
@@ -265,7 +268,6 @@ public class Streamer{
     }
 
     @Override public String toString(){
-        //avant de return convertir les addresses ip et identifiant dans le format demandé
         return id + " " + multicastIP + " " + multicastPort + " " + machineIP + " " + userPort; 
     }
 
