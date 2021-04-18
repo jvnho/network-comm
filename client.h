@@ -6,9 +6,6 @@ typedef struct infoStreamer{
     int multicastPort;
     int tcpPort;
 }infoStreamer;
-typedef struct client{
-    char id[9];//plus \0
-}client;
 extern int getListStreamer(char *adrStreamManager, int port, char result[99][58], int *result_len);
 extern int subscribe(infoStreamer info);
 #endif

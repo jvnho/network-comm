@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <assert.h>
 #include "client.h"
 //return len, or -1 if bad format
 int getLen(char *message){
@@ -262,11 +263,31 @@ int printList(infoStreamer info){
         printf("%s\n", tampon);
     }
 }
-int main(void){
-    client c;
-    memset(&c, 0, sizeof(client));
-    memcpy(c.id, "abcdef78", sizeof(char)*strlen("abcdef78"));
-    printf("\nclient : %s\n\n", c.id);
+void extractStreamManager(char *file, char *id, char *ip_manager, char *port_manager){
+    FILE * f = fopen(file, "r");
+    char *linep = NULL;
+    size_t tail = 0;
+
+    getline(&linep, &tail, f);
+    memcpy(id, linep, strlen(linep)-1);
+    getline(&linep, &tail, f);//9 avec a la ligne
+    memcpy(ip_manager, linep, strlen(linep)-1);
+    getline(&linep, &tail, f);
+    memcpy(port_manager, linep, strlen(linep));
+}
+int main(int n, char **args){
+    assert(n>1);
+    //extract manager information from file
+    char id[9];
+    char ip_manager[16];
+    char port_manager[5];
+    memset(id, 0, 9);
+    memset(ip_manager, 0, 16);
+    memset(port_manager, 0, 5);
+    extractStreamManager(args[1], id, ip_manager, port_manager);
+
+
+    printf("\nclient : %s\n\n", id);
     printf("_______________________\n\n");
     printf("Streamer List:\n\n");
     //showing the list of streamer from StreamerManager
@@ -274,7 +295,7 @@ int main(void){
     for(int i = 0; i<58; i++)memset(result[i], 0, 58);
     int len = 0;
     //gestionaire sur lulu, port 4141 ####### a mettre dans le fichier config
-    int test = getListStreamer("192.168.70.236", 4141, result, &len); //passer en argument grace au fichier de config(gestionnaire)
+    int test = getListStreamer(ip_manager, atoi(port_manager), result, &len); //passer en argument grace au fichier de config(gestionnaire)
     if(test == -1){
         printf("failed to get list\n");
         return -1;
@@ -322,7 +343,7 @@ int main(void){
         t = read(1, request, 3);
         request[t-1] = '\0';
         if(strcmp(request, "m") == 0){
-            sendMessage(stream, c.id);
+            sendMessage(stream, id);
         }else if(strcmp(request, "l")==0){
             printList(stream);
         }else{
