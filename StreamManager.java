@@ -134,8 +134,14 @@ public class StreamManager{
         }
 
         public void removeSocketFromMap(){
-            StreamManager.this.socketDescription.remove(this.socket);
-            this.socket.close();
+            try{
+                StreamManager.this.socketDescription.remove(this.socket);
+                this.socket.close();
+
+            } catch(IOException e){
+                System.out.println("IOException error when trying to close socket");
+                System.exit(0);
+            }
         }
     }
     
@@ -152,20 +158,11 @@ public class StreamManager{
             e.printStackTrace();
         }   
     }
-    public class MonRunnable implements Runnable{
-        Socket socket;
-        public MonRunnable(Socket s){
-            this.socket = s;
-        }
-        public void run(){
-
-        }
-    }
     //TODO
     public synchronized void update(){
         ArrayList<Thread> updating = new ArrayList<Thread>();
         this.socketDescription.forEach((socket, description)->{
-            Thread thread = new Thread(new MonRunnable(socket));
+            Thread thread = new Thread(new StreamerPresence(socket));
             updating.add(thread);
             thread.start();
         });
