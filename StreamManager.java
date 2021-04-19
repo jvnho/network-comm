@@ -7,6 +7,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ForkJoinTask;
 
 public class StreamManager{
     private ArrayList<Socket>listStreamerSocket;
@@ -22,7 +23,7 @@ public class StreamManager{
         this.port = port; //less than 9999
         this.lenMax = 99;
         this.currentLen = 0;
-        this.time_refresh = 5;
+        this.time_refresh = 10;
     }
 
     public void saveSocketStreamer(Socket soc, String message){
@@ -79,12 +80,9 @@ public class StreamManager{
             try{
                 BufferedReader reception = new BufferedReader(new InputStreamReader(soc.getInputStream()));//each message ends with \r\n
                 String message = reception.readLine(); //readline enleve le \n  ****???
-                System.out.println(message);
                 if(message.equals("LIST")){//communication avec client
-                    System.out.println("demande du client");
                     StreamManager.this.sendListToClient(this.soc);
                 }else if(message.substring(0, 4).equals("REGI")){
-                    System.out.println("demande du diffuseur");
                     StreamManager.this.saveSocketStreamer(this.soc, message);
                 }else{
                     System.out.println("fermeture");
@@ -113,7 +111,29 @@ public class StreamManager{
             e.printStackTrace();
         }   
     }
-
+    //TODO
+    public synchronized void update(){
+        ForkJoinTask.adapt(()->{
+            //pensé a lié le socket et listStreamer associe pour faciliter la synchronisation de la liste
+            //(peut etre utiliser un map)
+        });
+    }
+    public void printListStreamer(){
+        while(true){
+            try{
+                TimeUnit.SECONDS.sleep(this.time_refresh);
+                System.out.println("mis a jour\n");
+                synchronized(this){
+                    for(String s: this.listStreamer){
+                        System.out.println(s);
+                    }
+                }
+                System.out.println("-------------");
+            }catch(InterruptedException e){
+                e.printStackTrace();
+            }
+        }
+    }
     //test in case of being called in a synchronized block
     public synchronized String getCurrentLen(){
         String resutl = Integer.toString(this.currentLen);
@@ -121,19 +141,8 @@ public class StreamManager{
     }
     public static void main(String []args){
         StreamManager test = new StreamManager(Integer.parseInt(args[0]));
-        test.launchStreamManger();
-        //affichage incorect au niveau synchronisation
-        while(true){
-            try{
-                for(String s: test.listStreamer){
-                    System.out.println(s);
-                }
-                System.out.println("-------------");
-                TimeUnit.SECONDS.sleep(test.time_refresh);
-            }catch(InterruptedException e){
-                e.printStackTrace();
-            }
-        }
+        new Thread(()->test.launchStreamManger()).start();
+        new Thread(()->test.printListStreamer()).start();
         //"REGI RADIO### 127.000.000.001 0120 127.000.000.001 0120\r\n"
     }
 }

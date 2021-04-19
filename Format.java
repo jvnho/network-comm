@@ -18,9 +18,7 @@ public class Format{
         }
         return true;
     }
-    public static boolean isregi(String s){
-        System.out.println(s);
-        
+    public static boolean isregi(String s){        
         //creer des class exection pour faciliter les message d'erreur
         String []content = s.split(" ");
         if(content.length != 6){
