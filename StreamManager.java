@@ -179,7 +179,7 @@ public class StreamManager{
         while(true){
             try{
                 TimeUnit.SECONDS.sleep(this.time_refresh);
-                System.out.println("mis a jour\n");
+                update();
                 synchronized(this){
                     this.socketDescription.forEach((socket, description) -> System.out.println(description));
                 }
