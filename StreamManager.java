@@ -1,10 +1,12 @@
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ForkJoinTask;
@@ -95,6 +97,48 @@ public class StreamManager{
                 System.out.println("wrong message sended to the StreamManager");
                 try{soc.close();}catch(IOException a){}
             }
+        }
+    }
+
+    public class StreamerPresence implements Runnable{
+
+        private final static int TIMEOUT_DELAY = 1000;
+        private Socket socket;
+
+        public StreamerPresence(Socket s){
+            this.socket = s;
+        }
+
+        @Override public void run(){
+            try {
+                PrintWriter sending = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+                BufferedReader receving = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                socket.setSoTimeout(TIMEOUT_DELAY);
+                sending.print("RUOK\r\n");
+                sending.flush();
+                String recv = receving.readLine();
+                if(recv.equals("IMOK")){
+                    sending.print("");
+                    sending.flush();
+                    sending.close();
+                    receving.close();
+                } else {
+                    removeSocketFromMap();
+                }
+            } catch(InterruptedIOException  e){
+                removeSocketFromMap();
+            } catch(SocketException e){
+                System.out.println("Error when trying to set socket a timeout");
+                System.exit(0);
+            } catch(IOException e){
+                System.out.println("Error when trying to retrieve input/output stream");
+                System.exit(0);
+            }
+        }
+
+        public void removeSocketFromMap(){
+            StreamManager.this.socketDescription.remove(this.socket);
+            this.socket.close();
         }
     }
     
