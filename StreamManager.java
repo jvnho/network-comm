@@ -111,12 +111,31 @@ public class StreamManager{
             e.printStackTrace();
         }   
     }
+    public class MonRunnable implements Runnable{
+        Socket socket;
+        public MonRunnable(Socket s){
+            this.socket = s;
+        }
+        public void run(){
+
+        }
+    }
     //TODO
     public synchronized void update(){
-        ForkJoinTask.adapt(()->{
-            //pensé a lié le socket et listStreamer associe pour faciliter la synchronisation de la liste
-            //(peut etre utiliser un map)
-        });
+        ArrayList<Thread> updating = new ArrayList<Thread>();
+        for(Socket s: this.listStreamerSocket){
+            Thread thread = new Thread(new MonRunnable(s));
+            updating.add(thread);
+            thread.start();
+        }
+        try{
+            for(Thread t: updating){
+                t.join();
+            }
+        }catch(InterruptedException e){
+            System.out.println("error update\n");
+            e.printStackTrace();
+        }
     }
     public void printListStreamer(){
         while(true){
