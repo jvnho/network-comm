@@ -8,18 +8,17 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ForkJoinTask;
+import java.util.HashMap;
 
 public class StreamManager{
-    private ArrayList<Socket>listStreamerSocket;
-    private ArrayList<String> listStreamer;
+    private HashMap<Socket, String> socketDescription;
     private int port; 
     private int lenMax;
     private int currentLen;
     private int time_refresh;
 
     public StreamManager(int port){
-        this.listStreamerSocket = new ArrayList<Socket>();
-        this.listStreamer = new ArrayList<String>();;
+        this.socketDescription = new HashMap<Socket, String>();
         this.port = port; //less than 9999
         this.lenMax = 99;
         this.currentLen = 0;
@@ -33,12 +32,10 @@ public class StreamManager{
                 PrintWriter sending = new PrintWriter(new OutputStreamWriter(soc.getOutputStream()));
                 synchronized(this){
                     if(currentLen < lenMax){
-                        this.listStreamerSocket.add(soc);
-                        this.listStreamer.add(message+"\r\n");
+                        this.socketDescription.put(soc, message+"\r\n");
                         currentLen = currentLen + 1;
                         sending.println("REOK\r");// \r\n
                         sending.flush();
-
                     }else if(lenMax == currentLen){
                         sending.println("RENO\r");
                         sending.flush();
@@ -59,10 +56,10 @@ public class StreamManager{
             synchronized(this){
                 sending.println("LINB "+this.getCurrentLen()+"\r");// ? getCurrentLen is also synchronized check if don't block??
                 sending.flush();
-                for (String streamer : listStreamer) {
-                    sending.print(streamer);
+                this.socketDescription.forEach((socket, description)->{
+                    sending.print(description);
                     sending.flush();
-                }
+                });
                 soc.close();
             }
         }catch(IOException e){
@@ -123,11 +120,11 @@ public class StreamManager{
     //TODO
     public synchronized void update(){
         ArrayList<Thread> updating = new ArrayList<Thread>();
-        for(Socket s: this.listStreamerSocket){
-            Thread thread = new Thread(new MonRunnable(s));
+        this.socketDescription.forEach((socket, description)->{
+            Thread thread = new Thread(new MonRunnable(socket));
             updating.add(thread);
             thread.start();
-        }
+        });
         try{
             for(Thread t: updating){
                 t.join();
@@ -143,9 +140,7 @@ public class StreamManager{
                 TimeUnit.SECONDS.sleep(this.time_refresh);
                 System.out.println("mis a jour\n");
                 synchronized(this){
-                    for(String s: this.listStreamer){
-                        System.out.println(s);
-                    }
+                    this.socketDescription.forEach((socket, description) -> System.out.println(description));
                 }
                 System.out.println("-------------");
             }catch(InterruptedException e){
