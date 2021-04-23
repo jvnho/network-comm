@@ -416,9 +416,10 @@ public class Streamer{
                             pw.flush();
                         }
                     }
-                    br.close();
-                    pw.close();
                     socket.close();
+                }
+                catch(SocketException e){
+                    //utilisateur se déconnecte
                 }
                 catch(IOException e){
                     System.out.println("IOException ClientCommunication's runnable");
