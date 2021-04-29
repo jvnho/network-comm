@@ -12,23 +12,32 @@
 #include <pthread.h>
 #include <assert.h>
 #include "client.h"
+
 //return len, or -1 if bad format
 int getLen(char *message){
     char * tok = strtok(message, " ");
     if(strcmp(tok, "LINB")!=0){
-        printf("bad format received\n");
+        printf("error : bad format received, must (LINB numbre)\n");
         return -1;
     }
     int i = 0;
-    while(tok != NULL ) {
+    while(tok != NULL){
         if(i==1){//second token
+            if(strlen(tok)!=2){
+                printf("error : bad format received (should be to digit)\n");
+                return -1;
+            }
+            if(checkIntPositf(tok)==-1){
+                printf("error : bad format received (should be a positif integer)\n");
+                return -1;
+            }
             return atoi(tok);
         }
         tok = strtok(NULL, " ");
         i++;
     }
     if(i>2){ 
-        printf("bad format received\n");
+        printf("error : bad format received (more than 2 strings)\n");
         return -1;
     }
     return 1;
@@ -226,6 +235,15 @@ int printList(infoStreamer info){
     printf("\nGive a number betwen 0 and 999\n\n");
     int len = read(1, number, 3);
     number[len-1]='\0';
+    // numbre >= 0
+    int test = checkNumberLast(number);
+    while(test==-1){
+        printf("Enter a positif number, betwen 0 and 999\n\n");
+        memset(number, 0, 4);
+        len = read(1, number, 3);
+        number[len-1]='\0';
+        test = checkNumberLast(number);
+    }
     int n = atoi(number);
     //setup socket
     int soc = socket(PF_INET, SOCK_STREAM, 0);
@@ -276,6 +294,7 @@ void extractStreamManager(char *file, char *id, char *ip_manager, char *port_man
     memcpy(port_manager, linep, strlen(linep));
 }
 int main(int n, char **args){
+
     assert(n>1);
     //extract manager information from file
     char id[9];
@@ -294,7 +313,6 @@ int main(int n, char **args){
     char result[99][58];
     for(int i = 0; i<58; i++)memset(result[i], 0, 58);
     int len = 0;
-    //gestionaire sur lulu, port 4141 ####### a mettre dans le fichier config
     int test = getListStreamer(ip_manager, atoi(port_manager), result, &len); //passer en argument grace au fichier de config(gestionnaire)
     if(test == -1){
         printf("failed to get list\n");
@@ -303,6 +321,9 @@ int main(int n, char **args){
     if(len == 0){
         printf("Not streamer yet\n");
     }else{
+        if(checkFormatListItems(result, len)==-1){
+            return -1;
+        }
         for(int i = 0; i<len; i++){
             printf("[%d] %s\n",i, result[i]);
         }
