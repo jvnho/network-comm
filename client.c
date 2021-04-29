@@ -12,7 +12,8 @@
 #include <pthread.h>
 #include <assert.h>
 #include "client.h"
-
+#include "checker.h"
+//TODO if the connexion is interupted (recv, send ??)
 //return len, or -1 if bad format
 int getLen(char *message){
     char * tok = strtok(message, " ");
@@ -146,17 +147,33 @@ int subscribe(infoStreamer info){
 
     //preparing the socket to listen
     int sock=socket(PF_INET,SOCK_DGRAM,0);
-    int ok=1;
-    int r=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&ok,sizeof(ok));
-    struct sockaddr_in address_sock;
-    address_sock.sin_family=AF_INET;
-    address_sock.sin_port=htons(info.multicastPort);
-    address_sock.sin_addr.s_addr=htonl(INADDR_ANY);
-    r=bind(sock,(struct sockaddr *)&address_sock,sizeof(struct sockaddr_in));
-    struct ip_mreq mreq;
-    mreq.imr_multiaddr.s_addr=inet_addr(reformatedIp);
-    mreq.imr_interface.s_addr=htonl(INADDR_ANY);
-    r=setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&mreq,sizeof(mreq));
+    if(sock==-1){
+        printf("error: can't create socket (subscribe)\n");
+        return -1;
+    }
+    int check=1;
+    int test=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&check,sizeof(check));
+    if(test == -1){
+        printf("error: failed to reuse sock\n");
+        return -1;
+    }
+    struct sockaddr_in addr;
+    addr.sin_family=AF_INET;
+    addr.sin_port=htons(info.multicastPort);
+    addr.sin_addr.s_addr=htonl(INADDR_ANY);
+    test=bind(sock,(struct sockaddr *)&addr,sizeof(struct sockaddr_in));
+    if(test==-1){
+        printf("error: failed to bind\n");
+        return -1;
+    }
+    struct ip_mreq inscription;
+    inscription.imr_multiaddr.s_addr=inet_addr(reformatedIp);
+    inscription.imr_interface.s_addr=htonl(INADDR_ANY);
+    test=setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&inscription,sizeof(inscription));
+    if(test == -1){
+        printf("error: failed to subscribe to sock\n");
+        return -1;
+    }
     return sock;
 }
 void * printMessage(void *s){
@@ -200,14 +217,17 @@ int sendMessage(infoStreamer info, char *id){
         printf("error(printList) : can't create socket to get the list of n message\n");
         return -1;
     }
-    struct sockaddr_in adress_sock;
-    adress_sock.sin_family = AF_INET;
-    adress_sock.sin_port = htons(info.tcpPort);
-    inet_aton(reformatedIp, &adress_sock.sin_addr);
-
-    int c=connect(soc,(struct sockaddr *)&adress_sock,
-                sizeof(struct sockaddr_in));
-    if(c == -1){
+    struct sockaddr_in adr;
+    adr.sin_family = AF_INET;
+    adr.sin_port = htons(info.tcpPort);
+    int r = inet_aton(reformatedIp, &adr.sin_addr);
+    if(r == -1){
+        printf("error(sendMessage): failed to fill the adress\n");
+        close(soc);
+        return -1;
+    }
+    int connection=connect(soc,(struct sockaddr *)&adr, sizeof(struct sockaddr_in));
+    if(connection == -1){
         printf("error(sendMessage) : client can't connect\n");
         return -1;
     }
@@ -221,6 +241,11 @@ int sendMessage(infoStreamer info, char *id){
     char retour[5];
     memset(retour, 0, 5);
     recv(soc, retour, 4, 0);
+    if(strcmp(retour, "ACKM")!=0){
+        printf("should get ACKM, close connexion\n");
+        close(soc);
+        return -1;
+    }
     printf("%s\n", retour);
 }
 //ask and print the last n message
@@ -251,16 +276,19 @@ int printList(infoStreamer info){
         printf("error(printList) : can't create socket to get the list of n message\n");
         return -1;
     }
-    struct sockaddr_in adress_sock;
-    adress_sock.sin_family = AF_INET;
+    struct sockaddr_in adr;
+    adr.sin_family = AF_INET;
     printf("port = %d\n", info.tcpPort);
-    adress_sock.sin_port = htons(info.tcpPort);
+    adr.sin_port = htons(info.tcpPort);
     printf("reformated = %s\n", reformatedIp);
-    inet_aton(reformatedIp, &adress_sock.sin_addr);
-
-    int c=connect(soc,(struct sockaddr *)&adress_sock,
-                sizeof(struct sockaddr_in));
-    if(c == -1){
+    int r = inet_aton(reformatedIp, &adr.sin_addr);
+    if(r == -1){
+        printf("error(printList): failed to fill the adress\n");
+        close(soc);
+        return -1;
+    }
+    int connection =connect(soc,(struct sockaddr *)&adr, sizeof(struct sockaddr_in));
+    if(connection == -1){
         printf("error(printList) : client can't connect\n");
         return -1;
     }
@@ -270,8 +298,6 @@ int printList(infoStreamer info){
     memset(number, 0, 4);
     addZero(n, number);
     sprintf(message, "LAST %s\r\n", number);
-    printf("%s\n", message);
-    //send(soc, message, 10, 0);//a tester
     send(soc, message, strlen(message), 0);
     char tampon[162];
     for(int i = 0; i<n; i++){
@@ -287,6 +313,7 @@ void extractStreamManager(char *file, char *id, char *ip_manager, char *port_man
     size_t tail = 0;
 
     getline(&linep, &tail, f);
+    //TODO (remplir ## id client)
     memcpy(id, linep, strlen(linep)-1);
     getline(&linep, &tail, f);//9 avec a la ligne
     memcpy(ip_manager, linep, strlen(linep)-1);
@@ -331,12 +358,15 @@ int main(int n, char **args){
     printf("_______________________\n\n");
 
     //subscribe to streamer
-    printf("chose the index of streamer: \n\n");
-    int index = 0;
-    char buff[3];
-    memset(buff, 0, 2);
-    read(1, buff, 3);
-    index = atoi(buff);
+    int index = -1;
+    while(index<0 || index>=n){
+        printf("chose the index of streamer: \n\n");
+        char buff[3];
+        memset(buff, 0, 2);
+        read(1, buff, 3);
+        index = atoi(buff);
+    }
+    
     
     //parse the streamer buffer
     infoStreamer stream;
