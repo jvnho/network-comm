@@ -50,6 +50,7 @@ public class StreamManager{
         }catch(IOException e){
             System.out.println("error SaveSocketStreamer");
             e.printStackTrace();
+            try{soc.close();}catch(IOException a){}
         }
     }
     public void sendListToClient(Socket soc){
@@ -67,6 +68,7 @@ public class StreamManager{
         }catch(IOException e){
             System.out.println("error ClientQuery");
             e.printStackTrace();
+            try{soc.close();}catch(IOException a){}
         }
     }
 
@@ -90,14 +92,13 @@ public class StreamManager{
             }catch(IOException e){
                 System.out.println("reading or writing error");
                 e.printStackTrace();
+                try{soc.close();}catch(IOException a){}
             }catch(IndexOutOfBoundsException e){
                 System.out.println("wrong message sended to the StreamManager");
                 try{soc.close();}catch(IOException a){}
             }catch(NullPointerException e){
                 System.out.println("connexion has been interupted (client or Streamer) stoped\n");
-                try{
-                    soc.close();
-                }catch(IOException a){}
+                try{soc.close();}catch(IOException a){}
             }
         }
     }
@@ -163,6 +164,7 @@ public class StreamManager{
         }catch(IOException e){
             System.out.println("error on create serversocket");
             e.printStackTrace();
+            System.exit(0);
         }   
     }
     //TODO
@@ -180,6 +182,7 @@ public class StreamManager{
         }catch(InterruptedException e){
             System.out.println("error update\n");
             e.printStackTrace();
+            System.exit(0);
         }
     }
     public void printListStreamer(){
@@ -193,6 +196,7 @@ public class StreamManager{
                 System.out.println("-------------");
             }catch(InterruptedException e){
                 e.printStackTrace();
+                System.exit(0);
             }
         }
     }
