@@ -77,14 +77,22 @@ int getListStreamer(char *adrStreamManager, int port, char result[99][58],int *r
     send(soc, "LIST\r\n", sizeof(char)*strlen("LIST\r\n"), 0);
     char lenDescription[10];//7 \r\n add 0 at the end to avoid bad suprises
     memset(lenDescription, 0, 10);
-    recv(soc, lenDescription, 9, 0);
+    int test = recv(soc, lenDescription, 9, 0);
+    if(test == 0 || test == 1){
+        printf("error: StreamManager stoped\n");
+        exit(0);
+    }
     int len = getLen(lenDescription);
     if(len == -1)return -1;
     *result_len = len;
     char items[58];//\0 to avoid bad suprises
     for(int i=0; i<len; i++){
         memset(items, 0, 58);
-        recv(soc, items, 57, 0);
+        test = recv(soc, items, 57, 0);
+        if(test == 0 || test == 1){
+            printf("error: StremerManager stoped\n");
+            exit(0);
+        }
         memcpy(result[i], items, 58);
     }
     close(soc);
@@ -190,6 +198,10 @@ void * printMessage(void *s){
     while(1){
         memset(tampon, 0, 162);
         int rec=recv(soc,tampon,161,0);
+        if(rec == 0 || rec ==-1){
+            printf("error: stop receving\n");
+            return NULL;
+        }
         tampon[rec]='\0';
         write(fd, tampon, 161);
     }
@@ -247,11 +259,15 @@ int sendMessage(infoStreamer info, char *id){
     send(soc, message, 156, 0);
     char retour[5];
     memset(retour, 0, 5);
-    recv(soc, retour, 4, 0);
+    int test = recv(soc, retour, 4, 0);
+    if(test == 0|| test == -1){
+        printf("error: Streamer disconected\n");
+        exit(0);
+    }
     if(strcmp(retour, "ACKM")!=0){
         printf("should get ACKM, close connexion\n");
         close(soc);
-        return -1;
+        exit(0);
     }
     printf("%s\n", retour);
 }
@@ -310,6 +326,10 @@ int printList(infoStreamer info){
     for(int i = 0; i<n; i++){
         memset(tampon, 0, 162);
         int rec=recv(soc, tampon, 161, 0);
+        if(rec == -1||rec == 0){
+            printf("error: Streamer disconected\n");
+            exit(0);
+        }
         tampon[rec]='\0';
         printf("%s\n", tampon);
     }
