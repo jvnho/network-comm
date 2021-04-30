@@ -158,7 +158,7 @@ int subscribe(infoStreamer info){
         return -1;
     }
     int check=1;
-    int test=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&check,sizeof(check));
+    int test=setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&check,sizeof(check));
     if(test == -1){
         printf("error: failed to reuse sock\n");
         return -1;
@@ -169,6 +169,7 @@ int subscribe(infoStreamer info){
     addr.sin_addr.s_addr=htonl(INADDR_ANY);
     test=bind(sock,(struct sockaddr *)&addr,sizeof(struct sockaddr_in));
     if(test==-1){
+        perror("");
         printf("error: failed to bind\n");
         return -1;
     }
