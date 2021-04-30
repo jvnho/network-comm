@@ -447,9 +447,7 @@ public class Streamer{
                         Message m;
                         if(Streamer.this.messageFromClient.size() > 0) //s'il y a message qu'un client veut faire diffuser
                         {
-                            Streamer.this.readyToWriteMessage = false;
                             m = Streamer.this.messageFromClient.removeFirst();
-                            Streamer.this.readyToWriteMessage = true;
                         } else { //sinon on diffuse un message ordinaire du diffuseur
                             m = readFileMessage();
                         }
