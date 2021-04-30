@@ -117,15 +117,15 @@ public class StreamManager{
                 if(recv.equals("IMOK")){
                     sending.print("");
                     sending.flush();
-                    sending.close();
-                    receving.close();
                 } else {
                     removeSocketFromMap();
                 }
+            } catch(NullPointerException e){
+                removeSocketFromMap();
             } catch(InterruptedIOException  e){
                 removeSocketFromMap();
             } catch(SocketException e){
-                System.out.println("Error when trying to set socket a timeout");
+                e.printStackTrace();
                 System.exit(0);
             } catch(IOException e){
                 System.out.println("Error when trying to retrieve input/output stream");
@@ -136,6 +136,7 @@ public class StreamManager{
         public void removeSocketFromMap(){
             try{
                 StreamManager.this.socketDescription.remove(this.socket);
+                StreamManager.this.currentLen--;
                 this.socket.close();
 
             } catch(IOException e){
