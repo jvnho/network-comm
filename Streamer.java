@@ -83,9 +83,11 @@ public class Streamer{
             }
         } catch(FileNotFoundException e){
             System.out.println("Error: file configuration not found");
+            e.printStackTrace();
             System.exit(0);
         } catch(IOException e){
             System.out.println("Error when parsing config file.");
+            e.printStackTrace();
             System.exit(0);
         }
     }
@@ -137,6 +139,7 @@ public class Streamer{
             this.machineIP = addressToFormat(streamerAddr);
         } catch(UnknownHostException e){
             System.out.println("Error when retrieving streamer's ip address.");
+            e.printStackTrace();
             System.exit(0);
         }           
     }
@@ -182,6 +185,7 @@ public class Streamer{
             this.msgFileReader = new BufferedReader(fr);
         } catch(FileNotFoundException e){
             System.out.println("Could not find messages file");
+            e.printStackTrace();
             System.exit(0);
         }
 
@@ -199,9 +203,11 @@ public class Streamer{
         }
         catch(UnknownHostException e){
             System.out.println("Error when creating socket to communicate with manager");
+            e.printStackTrace();
             System.exit(0);
         } catch(IOException e){
             System.out.println("IOException error when trying to register to stream manager");
+            e.printStackTrace();
             System.exit(0);
         }
     }
@@ -218,10 +224,12 @@ public class Streamer{
             notifyAll();
         } catch (InterruptedException e){
             System.out.println("Wait exception error when writing");
+            e.printStackTrace();
             System.exit(0);
         } 
         catch (IllegalArgumentException e){
             System.out.println("Error when trying to create a Message instance object: message too long !");
+            e.printStackTrace();
             return false;
         }
         return true;
@@ -249,11 +257,13 @@ public class Streamer{
         } catch(IOException e){
             e.printStackTrace();
             System.out.println("IOException when trying to read file message content");
+            e.printStackTrace();
             System.exit(0);
         }
         catch(IllegalArgumentException e){
             e.printStackTrace();
             System.out.println("Error when trying to create a message: message too long !");
+            e.printStackTrace();
             System.exit(0);
         }
         return this.readFileMessage();
@@ -310,14 +320,23 @@ public class Streamer{
                         }
                     }
                 } else {
-                    this.br.close();
-                    this.pw.close();
                     this.communicationStreamer.close();
                 }
             } catch (IOException e){
                 e.printStackTrace();
                 System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
+                e.printStackTrace();
                 System.exit(0);
+            } catch (NullPointerException e){
+                System.out.println("Gestionnaire de diffuseur s'est déconnecté");
+                try {
+                    this.communicationStreamer.close();
+                } catch (IOException closeExcp){
+                    System.out.println("Could not close socket communication with streamer's manager");
+                    e.printStackTrace();
+                    System.exit(0);
+                }
+                
             }
         }
     }
@@ -332,6 +351,7 @@ public class Streamer{
             } catch(IOException e){
                 e.printStackTrace();
                 System.out.println("Error when creating ServerSocket object instance.");
+                e.printStackTrace();
                 System.exit(0);
             }
         }
@@ -350,8 +370,18 @@ public class Streamer{
             catch(IOException e){
                 e.printStackTrace();
                 System.out.println("Server attempt accepting connection error.");
+                e.printStackTrace();
                 System.exit(0);
-            } 
+            } catch(NullPointerException e){
+                System.out.println("TCP connection with client was interrupted.");
+                try {
+                    server.close();
+                } catch(IOException closeExcp){
+                    System.out.println("Could not close server socket TCP communication with client");
+                    e.printStackTrace();
+                    System.exit(0);
+                }
+            }
         }
         
         private class ClientCommunication implements Runnable{
@@ -416,9 +446,8 @@ public class Streamer{
                     }
                     socket.close();
                 }
-                catch(SocketException e){
-                    e.printStackTrace();
-                    //utilisateur se déconnecte
+                catch(NullPointerException e){
+                    System.out.println("Client communication was interrupted.");
                 }
                 catch(IOException e){
                     System.out.println("IOException ClientCommunication's runnable");
@@ -442,6 +471,7 @@ public class Streamer{
             } catch(SocketException e){
                 e.printStackTrace();
                 System.out.println("Could not create a DatagramSocket");
+                e.printStackTrace();
                 System.exit(0);
             }
         }
@@ -467,6 +497,7 @@ public class Streamer{
                     } catch(IOException e){
                         e.printStackTrace();
                         System.out.println("Streamer could not send package to subscribers");
+                        e.printStackTrace();
                         System.exit(0);
                     }
                 }
