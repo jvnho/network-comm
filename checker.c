@@ -78,8 +78,11 @@ int checkFormatItems(char items[58]){
     return 1;
 }
 int checkFormatListItems(char result[99][58], int n){
+    char copy[58];
     for(int i=0; i<n; i++){
-        if(checkFormatItems(result[i])==-1)return -1;
+        memset(copy, 0, 58);
+        strcpy(copy, result[i]);
+        if(checkFormatItems(copy)==-1)return -1;
     }
     return 0;
 }

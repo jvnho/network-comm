@@ -255,11 +255,13 @@ public class Streamer{
             //sinon on a atteint la fin du fichier donc un réinitialise le buffer et on appelle récursivement cette fonction
             this.msgFileReader = new BufferedReader(new FileReader(new File(this.pathToMsgFile)));
         } catch(IOException e){
+            e.printStackTrace();
             System.out.println("IOException when trying to read file message content");
             e.printStackTrace();
             System.exit(0);
         }
         catch(IllegalArgumentException e){
+            e.printStackTrace();
             System.out.println("Error when trying to create a message: message too long !");
             e.printStackTrace();
             System.exit(0);
@@ -321,6 +323,7 @@ public class Streamer{
                     this.communicationStreamer.close();
                 }
             } catch (IOException e){
+                e.printStackTrace();
                 System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
                 e.printStackTrace();
                 System.exit(0);
@@ -346,6 +349,7 @@ public class Streamer{
             try{
                 this.server = new ServerSocket(Streamer.this.userPort);
             } catch(IOException e){
+                e.printStackTrace();
                 System.out.println("Error when creating ServerSocket object instance.");
                 e.printStackTrace();
                 System.exit(0);
@@ -364,6 +368,7 @@ public class Streamer{
                 }   
             }
             catch(IOException e){
+                e.printStackTrace();
                 System.out.println("Server attempt accepting connection error.");
                 e.printStackTrace();
                 System.exit(0);
@@ -464,6 +469,7 @@ public class Streamer{
                 this.index = 0;
                 this.dso = new DatagramSocket();
             } catch(SocketException e){
+                e.printStackTrace();
                 System.out.println("Could not create a DatagramSocket");
                 e.printStackTrace();
                 System.exit(0);
@@ -489,6 +495,7 @@ public class Streamer{
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);
                     } catch(IOException e){
+                        e.printStackTrace();
                         System.out.println("Streamer could not send package to subscribers");
                         e.printStackTrace();
                         System.exit(0);
