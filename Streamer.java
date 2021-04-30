@@ -4,9 +4,6 @@ import java.util.LinkedList;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Optional;
-
-//execution: java Streamer nicolas 239.255.255.255 4242 5252 streamer_msg
 
 public class Streamer{
     
@@ -26,7 +23,7 @@ public class Streamer{
 
     private String pathToMsgFile;
     private boolean readyToWriteMessage;
-    private Optional<Message> messageFromClient;
+    private LinkedList<Message> messageFromClient;
 
     private StreamerTCP streamerTCP;
     private StreamerUDP streamerUDP;
@@ -86,9 +83,11 @@ public class Streamer{
             }
         } catch(FileNotFoundException e){
             System.out.println("Error: file configuration not found");
+            e.printStackTrace();
             System.exit(0);
         } catch(IOException e){
             System.out.println("Error when parsing config file.");
+            e.printStackTrace();
             System.exit(0);
         }
     }
@@ -140,6 +139,7 @@ public class Streamer{
             this.machineIP = addressToFormat(streamerAddr);
         } catch(UnknownHostException e){
             System.out.println("Error when retrieving streamer's ip address.");
+            e.printStackTrace();
             System.exit(0);
         }           
     }
@@ -177,7 +177,7 @@ public class Streamer{
     public void initMessageList(String path){
         this.pathToMsgFile = path;
         this.readyToWriteMessage = true;
-        this.messageFromClient = Optional.empty();
+        this.messageFromClient = new LinkedList<Message>();
         this.lastMessages = new LinkedList<Message>();
         try {
             File f = new File(path);
@@ -185,6 +185,7 @@ public class Streamer{
             this.msgFileReader = new BufferedReader(fr);
         } catch(FileNotFoundException e){
             System.out.println("Could not find messages file");
+            e.printStackTrace();
             System.exit(0);
         }
 
@@ -202,9 +203,11 @@ public class Streamer{
         }
         catch(UnknownHostException e){
             System.out.println("Error when creating socket to communicate with manager");
+            e.printStackTrace();
             System.exit(0);
         } catch(IOException e){
             System.out.println("IOException error when trying to register to stream manager");
+            e.printStackTrace();
             System.exit(0);
         }
     }
@@ -215,15 +218,20 @@ public class Streamer{
             while(this.readyToWriteMessage == false){
                 wait();
             }
+            if(originID.length() != 8)
+                return false;
             this.readyToWriteMessage = false;
-            this.messageFromClient = Optional.of(new Message(originID, msgToWrite));
+            this.messageFromClient.add(new Message(originID, msgToWrite));
+            this.readyToWriteMessage = true;
             notifyAll();
         } catch (InterruptedException e){
             System.out.println("Wait exception error when writing");
+            e.printStackTrace();
             System.exit(0);
         } 
         catch (IllegalArgumentException e){
             System.out.println("Error when trying to create a Message instance object: message too long !");
+            e.printStackTrace();
             return false;
         }
         return true;
@@ -249,11 +257,15 @@ public class Streamer{
             //sinon on a atteint la fin du fichier donc un réinitialise le buffer et on appelle récursivement cette fonction
             this.msgFileReader = new BufferedReader(new FileReader(new File(this.pathToMsgFile)));
         } catch(IOException e){
+            e.printStackTrace();
             System.out.println("IOException when trying to read file message content");
+            e.printStackTrace();
             System.exit(0);
         }
         catch(IllegalArgumentException e){
+            e.printStackTrace();
             System.out.println("Error when trying to create a message: message too long !");
+            e.printStackTrace();
             System.exit(0);
         }
         return this.readFileMessage();
@@ -310,13 +322,23 @@ public class Streamer{
                         }
                     }
                 } else {
-                    this.br.close();
-                    this.pw.close();
                     this.communicationStreamer.close();
                 }
             } catch (IOException e){
+                e.printStackTrace();
                 System.out.println("Erreur readLine dans le thread StreamManagerCommunication");
+                e.printStackTrace();
                 System.exit(0);
+            } catch (NullPointerException e){
+                System.out.println("Gestionnaire de diffuseur s'est déconnecté");
+                try {
+                    this.communicationStreamer.close();
+                } catch (IOException closeExcp){
+                    System.out.println("Could not close socket communication with streamer's manager");
+                    e.printStackTrace();
+                    System.exit(0);
+                }
+                
             }
         }
     }
@@ -329,7 +351,9 @@ public class Streamer{
             try{
                 this.server = new ServerSocket(Streamer.this.userPort);
             } catch(IOException e){
+                e.printStackTrace();
                 System.out.println("Error when creating ServerSocket object instance.");
+                e.printStackTrace();
                 System.exit(0);
             }
         }
@@ -346,9 +370,20 @@ public class Streamer{
                 }   
             }
             catch(IOException e){
+                e.printStackTrace();
                 System.out.println("Server attempt accepting connection error.");
+                e.printStackTrace();
                 System.exit(0);
-            } 
+            } catch(NullPointerException e){
+                System.out.println("TCP connection with client was interrupted.");
+                try {
+                    server.close();
+                } catch(IOException closeExcp){
+                    System.out.println("Could not close server socket TCP communication with client");
+                    e.printStackTrace();
+                    System.exit(0);
+                }
+            }
         }
         
         private class ClientCommunication implements Runnable{
@@ -364,61 +399,57 @@ public class Streamer{
                 {
                     BufferedReader br = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
                     PrintWriter pw = new PrintWriter(new OutputStreamWriter(this.socket.getOutputStream()));
-                    while(true)
+                    String query = br.readLine();
+                    String[] tokens = query.split(" ");
+                    if(tokens[0].equals("LAST"))
                     {
-                        String query = br.readLine();
-                        String[] tokens = query.split(" ");
-                        if(tokens[0].equals("LAST"))
-                        {
-                            if(tokens.length != 2){
-                                pw.print("Incorrect LAST argument format.\r\n");
-                                pw.flush();
-                            } else {
-                                if(!isNumber(tokens[1])){
-                                    pw.print("Incorrect number format.\r\n");
-                                    pw.flush();
-                                } else {
-                                    int n = Integer.valueOf(tokens[1]);
-                                    if(n < 0 || n > LIST_MAX_SIZE){
-                                        pw.print("Must be positive and less than " + (LIST_MAX_SIZE-1)+"\r\n");
-                                        pw.flush();
-                                    } else {
-                                        LinkedList<Message> history = Streamer.this.readHistory(n);
-                                        for(Message m : history)
-                                        {
-                                            pw.print("OLDM " + m.toString());
-                                            pw.flush();
-                                        }
-                                        pw.print("ENDM\r\n");
-                                        pw.flush();
-                                        break;
-                                    }
-                                }
-                            }
-                        } 
-                        else if(tokens[0].equals("MESS"))
-                        {
-                            if(tokens.length < 3) {
-                                pw.print("Incorrect MESS format.\r\n");
-                                pw.flush();
-                            } else {
-                                if(Streamer.this.write(tokens[1], query.substring(14)) == false){ //TODO: vérifier la taille de l'id du client ?
-                                    pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
-                                    pw.flush();
-                                } else {
-                                    pw.print("ACKM\r\n");
-                                    pw.flush();
-                                    break;
-                                }
-                            }
-                        } else{
-                            pw.print("Command not found.\r\n");
+                        if(tokens.length != 2){
+                            pw.print("Incorrect LAST argument format.\r\n");
                             pw.flush();
+                        } else {
+                            if(!isNumber(tokens[1]) && tokens[1].length() == 3){
+                                pw.print("Incorrect number format.\r\n");
+                                pw.flush();
+                            } else {
+                                int n = Integer.valueOf(tokens[1]);
+                                if(n < 0 || n > LIST_MAX_SIZE){
+                                    pw.print("Must be positive and less than " + (LIST_MAX_SIZE-1)+"\r\n");
+                                    pw.flush();
+                                } else {
+                                    LinkedList<Message> history = Streamer.this.readHistory(n);
+                                    for(Message m : history)
+                                    {
+                                        pw.print("OLDM " + m.toString());
+                                        pw.flush();
+                                    }
+                                    pw.print("ENDM\r\n");
+                                    pw.flush();
+                                }
+                            }
                         }
+                    } 
+                    else if(tokens[0].equals("MESS"))
+                    {
+                        if(tokens.length < 3) {
+                            pw.print("Incorrect MESS format.\r\n");
+                            pw.flush();
+                        } else {
+                            if(Streamer.this.write(tokens[1], query.substring(14)) == false){
+                                pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
+                                pw.flush();
+                            } else {
+                                pw.print("ACKM\r\n");
+                                pw.flush();
+                            }
+                        }
+                    } else{
+                        pw.print("Command not found.\r\n");
+                        pw.flush();
                     }
-                    br.close();
-                    pw.close();
                     socket.close();
+                }
+                catch(NullPointerException e){
+                    System.out.println("Client communication was interrupted.");
                 }
                 catch(IOException e){
                     System.out.println("IOException ClientCommunication's runnable");
@@ -439,8 +470,12 @@ public class Streamer{
             try {
                 this.index = 0;
                 this.dso = new DatagramSocket();
+                this.dso.setReuseAddress​(true);
+                System.setProperty("java.net.preferIPv4Stack" , "true");
             } catch(SocketException e){
+                e.printStackTrace();
                 System.out.println("Could not create a DatagramSocket");
+                e.printStackTrace();
                 System.exit(0);
             }
         }
@@ -451,11 +486,9 @@ public class Streamer{
                 @Override public void run(){
                     try{
                         Message m;
-                        if(Streamer.this.messageFromClient.isPresent()) //s'il y a message qu'un client veut faire diffuser
+                        if(Streamer.this.messageFromClient.size() > 0) //s'il y a message qu'un client veut faire diffuser
                         {
-                            m = Streamer.this.messageFromClient.get();
-                            Streamer.this.messageFromClient = Optional.empty();
-                            Streamer.this.readyToWriteMessage = true;
+                            m = Streamer.this.messageFromClient.removeFirst();
                         } else { //sinon on diffuse un message ordinaire du diffuseur
                             m = readFileMessage();
                         }
@@ -466,7 +499,9 @@ public class Streamer{
                         DatagramPacket paquet = new DatagramPacket(packet, packet.length, InetAddress.getByName(Streamer.this.multicastIP), Streamer.this.multicastPort);
                         dso.send(paquet);
                     } catch(IOException e){
+                        e.printStackTrace();
                         System.out.println("Streamer could not send package to subscribers");
+                        e.printStackTrace();
                         System.exit(0);
                     }
                 }

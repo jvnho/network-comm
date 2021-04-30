@@ -12,23 +12,39 @@
 #include <pthread.h>
 #include <assert.h>
 #include "client.h"
+#include "checker.h"
+//TODO if the connexion is interupted (recv, send ??)
 //return len, or -1 if bad format
 int getLen(char *message){
     char * tok = strtok(message, " ");
     if(strcmp(tok, "LINB")!=0){
-        printf("bad format received\n");
+        printf("error : bad format received, must (LINB numbre)\n");
         return -1;
     }
     int i = 0;
-    while(tok != NULL ) {
+    while(tok != NULL){
         if(i==1){//second token
+            printf("token = -%s-\n", tok);
+            printf("tail = %d\n", strlen(tok));
+            if(strlen(tok)!=4){
+                printf("error : bad format received (integer integer end of message)\n");
+                return -1;
+            }
+            if(strcmp("\r\n", tok+2)!=0){
+                printf("error: bad format (ending of message)\n");
+                return -1;
+            }
+            if(checkIntPositf(tok)==-1){
+                printf("error : bad format received (should be a positif integer)\n");
+                return -1;
+            }
             return atoi(tok);
         }
         tok = strtok(NULL, " ");
         i++;
     }
     if(i>2){ 
-        printf("bad format received\n");
+        printf("error : bad format received (more than 2 strings)\n");
         return -1;
     }
     return 1;
@@ -61,14 +77,22 @@ int getListStreamer(char *adrStreamManager, int port, char result[99][58],int *r
     send(soc, "LIST\r\n", sizeof(char)*strlen("LIST\r\n"), 0);
     char lenDescription[10];//7 \r\n add 0 at the end to avoid bad suprises
     memset(lenDescription, 0, 10);
-    recv(soc, lenDescription, 9, 0);
+    int test = recv(soc, lenDescription, 9, 0);
+    if(test == 0 || test == 1){
+        printf("error: StreamManager stoped\n");
+        exit(0);
+    }
     int len = getLen(lenDescription);
     if(len == -1)return -1;
     *result_len = len;
     char items[58];//\0 to avoid bad suprises
     for(int i=0; i<len; i++){
         memset(items, 0, 58);
-        recv(soc, items, 57, 0);
+        test = recv(soc, items, 57, 0);
+        if(test == 0 || test == 1){
+            printf("error: StremerManager stoped\n");
+            exit(0);
+        }
         memcpy(result[i], items, 58);
     }
     close(soc);
@@ -137,17 +161,34 @@ int subscribe(infoStreamer info){
 
     //preparing the socket to listen
     int sock=socket(PF_INET,SOCK_DGRAM,0);
-    int ok=1;
-    int r=setsockopt(sock,SOL_SOCKET,SO_REUSEPORT,&ok,sizeof(ok));
-    struct sockaddr_in address_sock;
-    address_sock.sin_family=AF_INET;
-    address_sock.sin_port=htons(info.multicastPort);
-    address_sock.sin_addr.s_addr=htonl(INADDR_ANY);
-    r=bind(sock,(struct sockaddr *)&address_sock,sizeof(struct sockaddr_in));
-    struct ip_mreq mreq;
-    mreq.imr_multiaddr.s_addr=inet_addr(reformatedIp);
-    mreq.imr_interface.s_addr=htonl(INADDR_ANY);
-    r=setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&mreq,sizeof(mreq));
+    if(sock==-1){
+        printf("error: can't create socket (subscribe)\n");
+        return -1;
+    }
+    int check=1;
+    int test=setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&check,sizeof(check));
+    if(test == -1){
+        printf("error: failed to reuse sock\n");
+        return -1;
+    }
+    struct sockaddr_in addr;
+    addr.sin_family=AF_INET;
+    addr.sin_port=htons(info.multicastPort);
+    addr.sin_addr.s_addr=htonl(INADDR_ANY);
+    test=bind(sock,(struct sockaddr *)&addr,sizeof(struct sockaddr_in));
+    if(test==-1){
+        perror("");
+        printf("error: failed to bind\n");
+        return -1;
+    }
+    struct ip_mreq inscription;
+    inscription.imr_multiaddr.s_addr=inet_addr(reformatedIp);
+    inscription.imr_interface.s_addr=htonl(INADDR_ANY);
+    test=setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&inscription,sizeof(inscription));
+    if(test == -1){
+        printf("error: failed to subscribe to sock\n");
+        return -1;
+    }
     return sock;
 }
 void * printMessage(void *s){
@@ -157,6 +198,10 @@ void * printMessage(void *s){
     while(1){
         memset(tampon, 0, 162);
         int rec=recv(soc,tampon,161,0);
+        if(rec == 0 || rec ==-1){
+            printf("error: stop receving\n");
+            return NULL;
+        }
         tampon[rec]='\0';
         write(fd, tampon, 161);
     }
@@ -191,14 +236,17 @@ int sendMessage(infoStreamer info, char *id){
         printf("error(printList) : can't create socket to get the list of n message\n");
         return -1;
     }
-    struct sockaddr_in adress_sock;
-    adress_sock.sin_family = AF_INET;
-    adress_sock.sin_port = htons(info.tcpPort);
-    inet_aton(reformatedIp, &adress_sock.sin_addr);
-
-    int c=connect(soc,(struct sockaddr *)&adress_sock,
-                sizeof(struct sockaddr_in));
-    if(c == -1){
+    struct sockaddr_in adr;
+    adr.sin_family = AF_INET;
+    adr.sin_port = htons(info.tcpPort);
+    int r = inet_aton(reformatedIp, &adr.sin_addr);
+    if(r == -1){
+        printf("error(sendMessage): failed to fill the adress\n");
+        close(soc);
+        return -1;
+    }
+    int connection=connect(soc,(struct sockaddr *)&adr, sizeof(struct sockaddr_in));
+    if(connection == -1){
         printf("error(sendMessage) : client can't connect\n");
         return -1;
     }
@@ -211,7 +259,16 @@ int sendMessage(infoStreamer info, char *id){
     send(soc, message, 156, 0);
     char retour[5];
     memset(retour, 0, 5);
-    recv(soc, retour, 4, 0);
+    int test = recv(soc, retour, 4, 0);
+    if(test == 0|| test == -1){
+        printf("error: Streamer disconected\n");
+        exit(0);
+    }
+    if(strcmp(retour, "ACKM")!=0){
+        printf("should get ACKM, close connexion\n");
+        close(soc);
+        exit(0);
+    }
     printf("%s\n", retour);
 }
 //ask and print the last n message
@@ -226,6 +283,15 @@ int printList(infoStreamer info){
     printf("\nGive a number betwen 0 and 999\n\n");
     int len = read(1, number, 3);
     number[len-1]='\0';
+    // numbre >= 0
+    int test = checkNumberLast(number);
+    while(test==-1){
+        printf("Enter a positif number, betwen 0 and 999\n\n");
+        memset(number, 0, 4);
+        len = read(1, number, 3);
+        number[len-1]='\0';
+        test = checkNumberLast(number);
+    }
     int n = atoi(number);
     //setup socket
     int soc = socket(PF_INET, SOCK_STREAM, 0);
@@ -233,16 +299,19 @@ int printList(infoStreamer info){
         printf("error(printList) : can't create socket to get the list of n message\n");
         return -1;
     }
-    struct sockaddr_in adress_sock;
-    adress_sock.sin_family = AF_INET;
+    struct sockaddr_in adr;
+    adr.sin_family = AF_INET;
     printf("port = %d\n", info.tcpPort);
-    adress_sock.sin_port = htons(info.tcpPort);
+    adr.sin_port = htons(info.tcpPort);
     printf("reformated = %s\n", reformatedIp);
-    inet_aton(reformatedIp, &adress_sock.sin_addr);
-
-    int c=connect(soc,(struct sockaddr *)&adress_sock,
-                sizeof(struct sockaddr_in));
-    if(c == -1){
+    int r = inet_aton(reformatedIp, &adr.sin_addr);
+    if(r == -1){
+        printf("error(printList): failed to fill the adress\n");
+        close(soc);
+        return -1;
+    }
+    int connection =connect(soc,(struct sockaddr *)&adr, sizeof(struct sockaddr_in));
+    if(connection == -1){
         printf("error(printList) : client can't connect\n");
         return -1;
     }
@@ -252,13 +321,15 @@ int printList(infoStreamer info){
     memset(number, 0, 4);
     addZero(n, number);
     sprintf(message, "LAST %s\r\n", number);
-    printf("%s\n", message);
-    //send(soc, message, 10, 0);//a tester
     send(soc, message, strlen(message), 0);
     char tampon[162];
     for(int i = 0; i<n; i++){
         memset(tampon, 0, 162);
         int rec=recv(soc, tampon, 161, 0);
+        if(rec == -1||rec == 0){
+            printf("error: Streamer disconected\n");
+            exit(0);
+        }
         tampon[rec]='\0';
         printf("%s\n", tampon);
     }
@@ -269,6 +340,7 @@ void extractStreamManager(char *file, char *id, char *ip_manager, char *port_man
     size_t tail = 0;
 
     getline(&linep, &tail, f);
+    //TODO (remplir ## id client)
     memcpy(id, linep, strlen(linep)-1);
     getline(&linep, &tail, f);//9 avec a la ligne
     memcpy(ip_manager, linep, strlen(linep)-1);
@@ -276,6 +348,7 @@ void extractStreamManager(char *file, char *id, char *ip_manager, char *port_man
     memcpy(port_manager, linep, strlen(linep));
 }
 int main(int n, char **args){
+
     assert(n>1);
     //extract manager information from file
     char id[9];
@@ -294,7 +367,6 @@ int main(int n, char **args){
     char result[99][58];
     for(int i = 0; i<58; i++)memset(result[i], 0, 58);
     int len = 0;
-    //gestionaire sur lulu, port 4141 ####### a mettre dans le fichier config
     int test = getListStreamer(ip_manager, atoi(port_manager), result, &len); //passer en argument grace au fichier de config(gestionnaire)
     if(test == -1){
         printf("failed to get list\n");
@@ -303,6 +375,9 @@ int main(int n, char **args){
     if(len == 0){
         printf("Not streamer yet\n");
     }else{
+        if(checkFormatListItems(result, len)==-1){
+            return -1;
+        }
         for(int i = 0; i<len; i++){
             printf("[%d] %s\n",i, result[i]);
         }
@@ -310,12 +385,15 @@ int main(int n, char **args){
     printf("_______________________\n\n");
 
     //subscribe to streamer
-    printf("chose the index of streamer: \n\n");
-    int index = 0;
-    char buff[3];
-    memset(buff, 0, 2);
-    read(1, buff, 3);
-    index = atoi(buff);
+    int index = -1;
+    while(index<0 || index>=n){
+        printf("chose the index of streamer: \n\n");
+        char buff[3];
+        memset(buff, 0, 2);
+        read(1, buff, 3);
+        index = atoi(buff);
+    }
+    
     
     //parse the streamer buffer
     infoStreamer stream;
