@@ -93,6 +93,11 @@ public class StreamManager{
             }catch(IndexOutOfBoundsException e){
                 System.out.println("wrong message sended to the StreamManager");
                 try{soc.close();}catch(IOException a){}
+            }catch(NullPointerException e){
+                System.out.println("connexion has been interupted (client or Streamer) stoped\n");
+                try{
+                    soc.close();
+                }catch(IOException a){}
             }
         }
     }
@@ -135,10 +140,11 @@ public class StreamManager{
 
         public void removeSocketFromMap(){
             try{
-                StreamManager.this.socketDescription.remove(this.socket);
-                StreamManager.this.currentLen--;
-                this.socket.close();
-
+                synchronized(StreamManager.this.socketDescription){
+                    StreamManager.this.socketDescription.remove(this.socket);
+                    StreamManager.this.currentLen--;
+                    this.socket.close();
+                }
             } catch(IOException e){
                 System.out.println("IOException error when trying to close socket");
                 System.exit(0);
