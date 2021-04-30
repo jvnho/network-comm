@@ -218,6 +218,8 @@ public class Streamer{
             while(this.readyToWriteMessage == false){
                 wait();
             }
+            if(originID.length() != 8)
+                return false;
             this.readyToWriteMessage = false;
             this.messageFromClient.add(new Message(originID, msgToWrite));
             this.readyToWriteMessage = true;
@@ -432,7 +434,7 @@ public class Streamer{
                             pw.print("Incorrect MESS format.\r\n");
                             pw.flush();
                         } else {
-                            if(Streamer.this.write(tokens[1], query.substring(14)) == false){ //TODO: vérifier la taille de l'id du client ?
+                            if(Streamer.this.write(tokens[1], query.substring(14)) == false){
                                 pw.print("Le diffuseur n'a pas accepté votre message.\r\n");
                                 pw.flush();
                             } else {
@@ -468,6 +470,8 @@ public class Streamer{
             try {
                 this.index = 0;
                 this.dso = new DatagramSocket();
+                this.dso.setReuseAddress​(true);
+                System.setProperty("java.net.preferIPv4Stack" , "true");
             } catch(SocketException e){
                 e.printStackTrace();
                 System.out.println("Could not create a DatagramSocket");
