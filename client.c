@@ -24,8 +24,6 @@ int getLen(char *message){
     int i = 0;
     while(tok != NULL){
         if(i==1){//second token
-            printf("token = -%s-\n", tok);
-            printf("tail = %d\n", strlen(tok));
             if(strlen(tok)!=4){
                 printf("error : bad format received (integer integer end of message)\n");
                 return -1;
