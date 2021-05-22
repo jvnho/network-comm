@@ -8,7 +8,7 @@ import java.util.TimerTask;
 public class Streamer{
     
     private static int LIST_MAX_SIZE = 1000;
-    private static int DELAY = 3000;
+    private static int DELAY = 2000;
 
     private String id;
     private int userPort;
@@ -470,7 +470,6 @@ public class Streamer{
             try {
                 this.index = 0;
                 this.dso = new DatagramSocket();
-                this.dso.setReuseAddress​(true);
                 System.setProperty("java.net.preferIPv4Stack" , "true");
             } catch(SocketException e){
                 e.printStackTrace();
